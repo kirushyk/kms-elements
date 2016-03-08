@@ -37,6 +37,46 @@ KMSHTTPEP_SRC=
 KMSELEMENTSINTERFACE_TARGET=libkmselementsinterface.a
 
 KMSELEMENTSINTERFACE_SRC= \
+./win32/server/interface/generated-cpp/RtpEndpointInternal.cpp \
+./win32/server/interface/generated-cpp/DispatcherInternal.cpp \
+./win32/server/interface/generated-cpp/MixerInternal.cpp \
+./win32/server/interface/generated-cpp/PlayerEndpointInternal.cpp \
+./win32/server/interface/generated-cpp/HttpPostEndpointInternal.cpp \
+./win32/server/interface/generated-cpp/HttpEndpointInternal.cpp \
+./win32/server/interface/generated-cpp/CompositeInternal.cpp \
+./win32/server/interface/generated-cpp/RecorderEndpointInternal.cpp \
+./win32/server/interface/generated-cpp/DispatcherOneToManyInternal.cpp \
+./win32/server/interface/generated-cpp/WebRtcEndpointInternal.cpp \
+./win32/server/interface/generated-cpp/AlphaBlendingInternal.cpp \
+./win32/server/interface/generated-cpp/RtpEndpoint.cpp \
+./win32/server/interface/generated-cpp/Dispatcher.cpp \
+./win32/server/interface/generated-cpp/Mixer.cpp \
+./win32/server/interface/generated-cpp/PlayerEndpoint.cpp \
+./win32/server/interface/generated-cpp/HttpPostEndpoint.cpp \
+./win32/server/interface/generated-cpp/HttpEndpoint.cpp \
+./win32/server/interface/generated-cpp/Composite.cpp \
+./win32/server/interface/generated-cpp/RecorderEndpoint.cpp \
+./win32/server/interface/generated-cpp/DispatcherOneToMany.cpp \
+./win32/server/interface/generated-cpp/WebRtcEndpoint.cpp \
+./win32/server/interface/generated-cpp/AlphaBlending.cpp \
+./win32/server/interface/generated-cpp/OnKeySoftLimit.cpp \
+./win32/server/interface/generated-cpp/Recording.cpp \
+./win32/server/interface/generated-cpp/Paused.cpp \
+./win32/server/interface/generated-cpp/Stopped.cpp \
+./win32/server/interface/generated-cpp/OnIceCandidate.cpp \
+./win32/server/interface/generated-cpp/OnIceGatheringDone.cpp \
+./win32/server/interface/generated-cpp/OnIceComponentStateChanged.cpp \
+./win32/server/interface/generated-cpp/OnDataChannelOpened.cpp \
+./win32/server/interface/generated-cpp/OnDataChannelClosed.cpp \
+./win32/server/interface/generated-cpp/NewCandidatePairSelected.cpp \
+./win32/server/interface/generated-cpp/EndOfStream.cpp \
+./win32/server/interface/generated-cpp/MediaProfileSpecType.cpp \
+./win32/server/interface/generated-cpp/CryptoSuite.cpp \
+./win32/server/interface/generated-cpp/SDES.cpp \
+./win32/server/interface/generated-cpp/VideoInfo.cpp \
+./win32/server/interface/generated-cpp/IceCandidate.cpp \
+./win32/server/interface/generated-cpp/IceComponentState.cpp \
+./win32/server/interface/generated-cpp/IceCandidatePair.cpp
 
 KMSELEMENTSIMPL_TARGET=libkmselementsimpl.dll
 
@@ -55,10 +95,12 @@ KMSELEMENTSIMPL_OBJS=$(KMSELEMENTSIMPL_SRC:.cpp=.o)
 KMSELEMENTSMODULE_OBJS=$(KMSELEMENTSMODULE_SRC:.cpp=.o)
 
 all: \
-$(TARGET_DIR)/$(KMSHTTPEP_TARGET) \
 $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET) \
-$(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET) \
-$(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET) \
+
+# $(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET) \
+# $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET) \
+
+# $(TARGET_DIR)/$(KMSHTTPEP_TARGET) \
 
 $(TARGET_DIR)/$(KMSHTTPEP_TARGET): $(KMSHTTPEP_SRC)
 	mkdir -p $(TARGET_DIR)
