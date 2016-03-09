@@ -20,6 +20,9 @@ CFLAGS= \
 -I/usr/i686-w64-mingw32/sys-root/mingw/lib/glibmm-2.4/include \
 -I/usr/i686-w64-mingw32/sys-root/mingw/include/sigc++-2.0 \
 -I/usr/i686-w64-mingw32/sys-root/mingw/lib/sigc++-2.0/include \
+-I../kms-core/win32/server/interface/generated-cpp/ \
+-I../kms-core/src/server/interface/ \
+-I../kms-core/src/server/implementation/ \
 -I./win32/server/implementation/generated-cpp/ \
 -I./win32/server/interface/generated-cpp/  \
 -I./src/server/implementation/ \
