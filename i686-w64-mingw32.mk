@@ -122,9 +122,11 @@ KMSELEMENTSIMPL_LIBS= \
 -lglib-2.0 \
 -lgstreamer-1.0 \
 -lkmselementsinterface \
+-lkmsgstcommons \
 -lkmscoreimpl.dll \
 -lkmsjsoncpp.dll \
--lkmsjsonrpc.dll
+-lkmsjsonrpc.dll \
+-lboost_system-mt
 
 KMSELEMENTSMODULE_TARGET=libkmselementsmodule.dll
 
