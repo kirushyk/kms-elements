@@ -84,6 +84,29 @@ KMSELEMENTSINTERFACE_SRC= \
 KMSELEMENTSIMPL_TARGET=libkmselementsimpl.dll
 
 KMSELEMENTSIMPL_SRC= \
+./win32/server/implementation/objects/RtpEndpointImpl.cpp \
+./win32/server/implementation/objects/DispatcherImpl.cpp \
+./win32/server/implementation/objects/MixerImpl.cpp \
+./win32/server/implementation/objects/PlayerEndpointImpl.cpp \
+./win32/server/implementation/objects/HttpPostEndpointImpl.cpp \
+./win32/server/implementation/objects/HttpEndpointImpl.cpp \
+./win32/server/implementation/objects/CompositeImpl.cpp \
+./win32/server/implementation/objects/RecorderEndpointImpl.cpp \
+./win32/server/implementation/objects/DispatcherOneToManyImpl.cpp \
+./win32/server/implementation/objects/WebRtcEndpointImpl.cpp \
+./win32/server/implementation/objects/AlphaBlendingImpl.cpp \
+./win32/server/implementation/generated-cpp/SerializerExpanderElements.cpp \
+./win32/server/implementation/generated-cpp/RtpEndpointImplInternal.cpp \
+./win32/server/implementation/generated-cpp/DispatcherImplInternal.cpp \
+./win32/server/implementation/generated-cpp/MixerImplInternal.cpp \
+./win32/server/implementation/generated-cpp/PlayerEndpointImplInternal.cpp \
+./win32/server/implementation/generated-cpp/HttpPostEndpointImplInternal.cpp \
+./win32/server/implementation/generated-cpp/HttpEndpointImplInternal.cpp \
+./win32/server/implementation/generated-cpp/CompositeImplInternal.cpp \
+./win32/server/implementation/generated-cpp/RecorderEndpointImplInternal.cpp \
+./win32/server/implementation/generated-cpp/DispatcherOneToManyImplInternal.cpp \
+./win32/server/implementation/generated-cpp/WebRtcEndpointImplInternal.cpp \
+./win32/server/implementation/generated-cpp/AlphaBlendingImplInternal.cpp
 
 KMSELEMENTSIMPL_LIBS= \
 
@@ -99,8 +122,8 @@ KMSELEMENTSMODULE_OBJS=$(KMSELEMENTSMODULE_SRC:.cpp=.o)
 
 all: \
 $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET) \
+$(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET) \
 
-# $(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET) \
 # $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET) \
 
 # $(TARGET_DIR)/$(KMSHTTPEP_TARGET) \
