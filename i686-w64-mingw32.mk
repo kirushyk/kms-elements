@@ -12,6 +12,7 @@ CFLAGS= \
 -DVERSION="\"6.4.1.6\"" \
 -Duint="unsigned" \
 -DWIN32_LEAN_AND_MEAN=1 \
+-I/usr/i686-w64-mingw32/sys-root/mingw/include/libsoup-2.4 \
 -I/usr/i686-w64-mingw32/sys-root/mingw/include/gstreamer-1.0 \
 -I/usr/i686-w64-mingw32/sys-root/mingw/lib/gstreamer-1.0/include \
 -I/usr/i686-w64-mingw32/sys-root/mingw/include/glib-2.0 \
@@ -28,6 +29,7 @@ CFLAGS= \
 -I../kms-core/win32/server/implementation/generated-cpp/ \
 -I./win32/server/implementation/generated-cpp/ \
 -I./win32/server/interface/generated-cpp/  \
+-I./src/server/implementation/HttpServer/ \
 -I./src/server/implementation/ \
 -I./src/server/interface/ \
 -I./src/gst-plugins/ \
@@ -38,7 +40,15 @@ CFLAGS= \
 -I./win32
 
 KMSHTTPEP_TARGET=libkmshttpep.a
-KMSHTTPEP_SRC=
+
+KMSHTTPEP_C_SRC= \
+win32/server/implementation/HttpServer/http-marshal.c \
+win32/server/implementation/HttpServer/http-enumtypes.c
+
+KMSHTTPEP_CXX_SRC= \
+src/server/implementation/HttpServer/KmsHttpPost.cpp \
+src/server/implementation/HttpServer/KmsHttpEPServer.cpp \
+src/server/implementation/HttpServer/HttpEndPointServer.cpp
 
 KMSELEMENTSINTERFACE_TARGET=libkmselementsinterface.a
 
@@ -134,22 +144,22 @@ KMSELEMENTSMODULE_SRC= \
 
 KMSELEMENTSMODULE_LIBS= \
 
+KMSHTTPEP_C_OBJS=$(KMSHTTPEP_C_SRC:.c=.o)
+KMSHTTPEP_CXX_OBJS=$(KMSHTTPEP_CXX_SRC:.cpp=.o)
 KMSELEMENTSINTERFACE_OBJS=$(KMSELEMENTSINTERFACE_SRC:.cpp=.o)
 KMSELEMENTSIMPL_OBJS=$(KMSELEMENTSIMPL_SRC:.cpp=.o)
 KMSELEMENTSMODULE_OBJS=$(KMSELEMENTSMODULE_SRC:.cpp=.o)
 
 all: \
 $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET) \
+$(TARGET_DIR)/$(KMSHTTPEP_TARGET) \
 $(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET) \
 
 # $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET) \
 
-# $(TARGET_DIR)/$(KMSHTTPEP_TARGET) \
-
-$(TARGET_DIR)/$(KMSHTTPEP_TARGET): $(KMSHTTPEP_SRC)
+$(TARGET_DIR)/$(KMSHTTPEP_TARGET): $(KMSHTTPEP_C_OBJS) $(KMSHTTPEP_CXX_OBJS)
 	mkdir -p $(TARGET_DIR)
-	$(CC) -c $(CFLAGS) -o $(TARGET_DIR)/$(KMSHTTPEP_TARGET).o $(KMSHTTPEP_SRC)
-	$(AR) cr $(TARGET_DIR)/$(KMSHTTPEP_TARGET) $(TARGET_DIR)/$(KMSHTTPEP_TARGET).o
+	$(AR) cr $(TARGET_DIR)/$(KMSHTTPEP_TARGET) $(KMSHTTPEP_C_OBJS) $(KMSHTTPEP_CXX_OBJS)
 	$(RANLIB) $(TARGET_DIR)/$(KMSHTTPEP_TARGET)
 
 $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET): $(KMSELEMENTSINTERFACE_OBJS)
