@@ -23,6 +23,9 @@ CFLAGS= \
 -I../kms-core/win32/server/interface/generated-cpp/ \
 -I../kms-core/src/server/interface/ \
 -I../kms-core/src/server/implementation/ \
+-I../kms-core/src/server/implementation/objects/ \
+-I../kms-core/src/gst-plugins/ \
+-I../kms-core/win32/server/implementation/generated-cpp/ \
 -I./win32/server/implementation/generated-cpp/ \
 -I./win32/server/interface/generated-cpp/  \
 -I./src/server/implementation/ \
