@@ -120,6 +120,7 @@ KMSELEMENTSIMPL_LIBS= \
 -lglibmm-2.4 \
 -lgobject-2.0 \
 -lglib-2.0 \
+-lgstreamer-1.0 \
 -lkmselementsinterface \
 -lkmscoreimpl.dll \
 -lkmsjsoncpp.dll \
