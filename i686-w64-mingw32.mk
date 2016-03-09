@@ -116,6 +116,10 @@ KMSELEMENTSIMPL_LIBS= \
 -L../jsoncpp/build/ \
 -L../kms-core/build/ \
 -L./build/ \
+-lsigc-2.0 \
+-lglibmm-2.4 \
+-lgobject-2.0 \
+-lglib-2.0 \
 -lkmselementsinterface \
 -lkmscoreimpl.dll \
 -lkmsjsoncpp.dll \
