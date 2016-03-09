@@ -1,0 +1,2 @@
+/usr/bin/ar cr libkmshttpep.a  CMakeFiles/kmshttpep.dir/KmsHttpEPServer.cpp.o CMakeFiles/kmshttpep.dir/KmsHttpPost.cpp.o CMakeFiles/kmshttpep.dir/HttpEndPointServer.cpp.o CMakeFiles/kmshttpep.dir/http-marshal.c.o CMakeFiles/kmshttpep.dir/http-enumtypes.c.o
+/usr/bin/ranlib libkmshttpep.a
