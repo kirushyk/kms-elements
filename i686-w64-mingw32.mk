@@ -112,6 +112,10 @@ KMSELEMENTSIMPL_SRC= \
 ./win32/server/implementation/generated-cpp/AlphaBlendingImplInternal.cpp
 
 KMSELEMENTSIMPL_LIBS= \
+-L../jsoncpp/build/ \
+-L./build/ \
+-lkmselementsinterface \
+-lkmsjsoncpp.dll
 
 KMSELEMENTSMODULE_TARGET=libkmselementsmodule.dll
 
