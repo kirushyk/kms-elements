@@ -84,17 +84,17 @@ KMSELEMENTSINTERFACE_SRC= \
 KMSELEMENTSIMPL_TARGET=libkmselementsimpl.dll
 
 KMSELEMENTSIMPL_SRC= \
-./win32/server/implementation/objects/RtpEndpointImpl.cpp \
-./win32/server/implementation/objects/DispatcherImpl.cpp \
-./win32/server/implementation/objects/MixerImpl.cpp \
-./win32/server/implementation/objects/PlayerEndpointImpl.cpp \
-./win32/server/implementation/objects/HttpPostEndpointImpl.cpp \
-./win32/server/implementation/objects/HttpEndpointImpl.cpp \
-./win32/server/implementation/objects/CompositeImpl.cpp \
-./win32/server/implementation/objects/RecorderEndpointImpl.cpp \
-./win32/server/implementation/objects/DispatcherOneToManyImpl.cpp \
-./win32/server/implementation/objects/WebRtcEndpointImpl.cpp \
-./win32/server/implementation/objects/AlphaBlendingImpl.cpp \
+./src/server/implementation/objects/RtpEndpointImpl.cpp \
+./src/server/implementation/objects/DispatcherImpl.cpp \
+./src/server/implementation/objects/MixerImpl.cpp \
+./src/server/implementation/objects/PlayerEndpointImpl.cpp \
+./src/server/implementation/objects/HttpPostEndpointImpl.cpp \
+./src/server/implementation/objects/HttpEndpointImpl.cpp \
+./src/server/implementation/objects/CompositeImpl.cpp \
+./src/server/implementation/objects/RecorderEndpointImpl.cpp \
+./src/server/implementation/objects/DispatcherOneToManyImpl.cpp \
+./src/server/implementation/objects/WebRtcEndpointImpl.cpp \
+./src/server/implementation/objects/AlphaBlendingImpl.cpp \
 ./win32/server/implementation/generated-cpp/SerializerExpanderElements.cpp \
 ./win32/server/implementation/generated-cpp/RtpEndpointImplInternal.cpp \
 ./win32/server/implementation/generated-cpp/DispatcherImplInternal.cpp \
