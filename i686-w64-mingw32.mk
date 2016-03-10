@@ -12,6 +12,8 @@ CFLAGS= \
 -DVERSION="\"6.4.1.6\"" \
 -Duint="unsigned" \
 -DWIN32_LEAN_AND_MEAN=1 \
+-I./win32/server/implementation/HttpServer/ \
+-I/usr/i686-w64-mingw32/sys-root/mingw/include/nice \
 -I/usr/i686-w64-mingw32/sys-root/mingw/include/libsoup-2.4 \
 -I/usr/i686-w64-mingw32/sys-root/mingw/include/gstreamer-1.0 \
 -I/usr/i686-w64-mingw32/sys-root/mingw/lib/gstreamer-1.0/include \
