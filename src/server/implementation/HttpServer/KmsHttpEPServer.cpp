@@ -15,7 +15,12 @@
 
 #include <time.h>
 #include <libsoup/soup.h>
+#if _WIN32
+#include <rpc.h>
+#include <ole2.h>
+#else
 #include <uuid/uuid.h>
+#endif
 #include <string.h>
 #include <gio/gio.h>
 #include <nice/interfaces.h>
