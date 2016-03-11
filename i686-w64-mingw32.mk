@@ -23,6 +23,7 @@ CFLAGS= \
 -I/usr/i686-w64-mingw32/sys-root/mingw/lib/glibmm-2.4/include \
 -I/usr/i686-w64-mingw32/sys-root/mingw/include/sigc++-2.0 \
 -I/usr/i686-w64-mingw32/sys-root/mingw/lib/sigc++-2.0/include \
+-I../kurento-media-server/win32/webrtcendpoint/ \
 -I../kms-core/win32/server/interface/generated-cpp/ \
 -I../kms-core/src/server/interface/ \
 -I../kms-core/src/server/implementation/ \
@@ -31,6 +32,7 @@ CFLAGS= \
 -I../kms-core/win32/server/implementation/generated-cpp/ \
 -I./win32/server/implementation/generated-cpp/ \
 -I./win32/server/interface/generated-cpp/  \
+-I./src/gst-plugins/webrtcendpoint/ \
 -I./src/server/implementation/HttpServer/ \
 -I./src/server/implementation/ \
 -I./src/server/interface/ \
@@ -96,6 +98,32 @@ KMSELEMENTSINTERFACE_SRC= \
 ./win32/server/interface/generated-cpp/IceComponentState.cpp \
 ./win32/server/interface/generated-cpp/IceCandidatePair.cpp
 
+KMSWEBRTCENDPOINTLIB_TARGET=libkmswebrtcendpointlib.dll
+
+KMSWEBRTCENDPOINTLIB_SRC= \
+./src/gst-plugins/webrtcendpoint/kmswebrtcbaseconnection.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtcconnection.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtcrtcpmuxconnection.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtcbundleconnection.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtcsctpconnection.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtctransportsrcnice.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtctransportsinknice.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtctransportsrc.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtctransportsink.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtctransport.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtcsession.c \
+./src/gst-plugins/webrtcendpoint/kmswebrtcendpoint.c \
+./src/gst-plugins/webrtcendpoint/kmsicecandidate.c \
+./src/gst-plugins/webrtcendpoint/kmsicebaseagent.c \
+./src/gst-plugins/webrtcendpoint/kmsiceniceagent.c \
+./src/gst-plugins/webrtcendpoint/kms-webrtc-marshal.c
+
+KMSWEBRTCENDPOINTLIB_LIBS= \
+-L/usr/i686-w64-mingw32/sys-root/mingw/lib \
+-L/usr/lib/gcc/i686-w64-mingw32/5.2.0 \
+-L/usr/i686-w64-mingw32/lib/ \
+-L../kms-core/build/ \
+
 KMSELEMENTSIMPL_TARGET=libkmselementsimpl.dll
 
 KMSELEMENTSIMPL_SRC= \
@@ -149,14 +177,16 @@ KMSELEMENTSMODULE_LIBS= \
 KMSHTTPEP_C_OBJS=$(KMSHTTPEP_C_SRC:.c=.o)
 KMSHTTPEP_CXX_OBJS=$(KMSHTTPEP_CXX_SRC:.cpp=.o)
 KMSELEMENTSINTERFACE_OBJS=$(KMSELEMENTSINTERFACE_SRC:.cpp=.o)
+KMSWEBRTCENDPOINTLIB_OBJS=$(KMSWEBRTCENDPOINTLIB_SRC:.c=.o)
 KMSELEMENTSIMPL_OBJS=$(KMSELEMENTSIMPL_SRC:.cpp=.o)
 KMSELEMENTSMODULE_OBJS=$(KMSELEMENTSMODULE_SRC:.cpp=.o)
 
 all: \
 $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET) \
 $(TARGET_DIR)/$(KMSHTTPEP_TARGET) \
-$(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET) \
+$(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET)
 
+# $(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET) \
 # $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET) \
 
 $(TARGET_DIR)/$(KMSHTTPEP_TARGET): $(KMSHTTPEP_C_OBJS) $(KMSHTTPEP_CXX_OBJS)
@@ -168,6 +198,10 @@ $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET): $(KMSELEMENTSINTERFACE_OBJS)
 	mkdir -p $(TARGET_DIR)
 	$(AR) cr $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET) $(KMSELEMENTSINTERFACE_OBJS)
 	$(RANLIB) $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET)
+
+$(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET): $(KMSWEBRTCENDPOINTLIB_OBJS)
+	mkdir -p $(TARGET_DIR)
+	$(CC) -shared -o $(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET) $(CFLAGS) $(KMSWEBRTCENDPOINTLIB_OBJS) $(KMSWEBRTCENDPOINTLIB_LIBS) -Wl,--out-implib,$(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET).a
 
 $(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET): $(KMSELEMENTSIMPL_OBJS)
 	mkdir -p $(TARGET_DIR)
