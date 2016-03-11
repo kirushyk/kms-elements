@@ -130,7 +130,8 @@ KMSWEBRTCENDPOINTLIB_SRC= \
 ./src/gst-plugins/webrtcendpoint/kmsicecandidate.c \
 ./src/gst-plugins/webrtcendpoint/kmsicebaseagent.c \
 ./src/gst-plugins/webrtcendpoint/kmsiceniceagent.c \
-./win32/gst-plugins/webrtcendpoint/kms-webrtc-marshal.c
+./win32/gst-plugins/webrtcendpoint/kms-webrtc-marshal.c \
+./win32/gst-plugins/webrtcendpoint/kms-webrtc-data-marshal.c
 
 KMSWEBRTCENDPOINTLIB_LIBS= \
 -L/usr/i686-w64-mingw32/sys-root/mingw/lib \
@@ -143,6 +144,7 @@ KMSWEBRTCENDPOINTLIB_LIBS= \
 -lgobject-2.0 \
 -lglib-2.0 \
 -lgstreamer-1.0 \
+-lgstapp-1.0.dll \
 -lkmssdpagent \
 -lkmsgstcommons \
 -lnice
