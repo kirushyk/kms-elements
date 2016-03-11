@@ -98,6 +98,20 @@ KMSELEMENTSINTERFACE_SRC= \
 ./win32/server/interface/generated-cpp/IceComponentState.cpp \
 ./win32/server/interface/generated-cpp/IceCandidatePair.cpp
 
+RTPENDPOINT_TARGET=librtpendpoint.dll
+
+RTPENDPOINT_SRC= \
+/src/gst-plugins/rtpendpoint/kmsrtpconnection.c \
+/src/gst-plugins/rtpendpoint/kmssrtpconnection.c \
+/src/gst-plugins/rtpendpoint/kmsrtpsession.c \
+/src/gst-plugins/rtpendpoint/kmssrtpsession.c \
+/src/gst-plugins/rtpendpoint/kmsrtpendpoint.c \
+/src/gst-plugins/rtpendpoint/kmssocketutils.c \
+/src/gst-plugins/rtpendpoint/kmsrandom.c \
+./win32/gst-plugins/rtpendpoint/kms-rtp-enumtypes.c
+
+RTPENDPOINT_LIBS=
+
 KMSWEBRTCENDPOINTLIB_TARGET=libkmswebrtcendpointlib.dll
 
 KMSWEBRTCENDPOINTLIB_SRC= \
@@ -191,8 +205,10 @@ KMSELEMENTSMODULE_OBJS=$(KMSELEMENTSMODULE_SRC:.cpp=.o)
 all: \
 $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET) \
 $(TARGET_DIR)/$(KMSHTTPEP_TARGET) \
-$(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET)
+$(TARGET_DIR)/$(RTPENDPOINT_TARGET) \
 
+
+# $(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET) \
 # $(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET) \
 # $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET) \
 
@@ -205,6 +221,10 @@ $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET): $(KMSELEMENTSINTERFACE_OBJS)
 	mkdir -p $(TARGET_DIR)
 	$(AR) cr $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET) $(KMSELEMENTSINTERFACE_OBJS)
 	$(RANLIB) $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET)
+
+$(TARGET_DIR)/$(RTPENDPOINT_TARGET): $(RTPENDPOINT_OBJS)
+	mkdir -p $(TARGET_DIR)
+	$(CC) -shared -o $(TARGET_DIR)/$(RTPENDPOINT_TARGET) $(CFLAGS) $(RTPENDPOINT_OBJS) $(RTPENDPOINT_LIBS) -Wl,--out-implib,$(TARGET_DIR)/$(RTPENDPOINT_TARGET).a
 
 $(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET): $(KMSWEBRTCENDPOINTLIB_OBJS)
 	mkdir -p $(TARGET_DIR)
