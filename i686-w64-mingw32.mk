@@ -123,10 +123,13 @@ KMSWEBRTCENDPOINTLIB_LIBS= \
 -L/usr/lib/gcc/i686-w64-mingw32/5.2.0 \
 -L/usr/i686-w64-mingw32/lib/ \
 -L../kms-core/build/ \
+-lgstsdp-1.0.dll \
 -lglibmm-2.4 \
 -lgobject-2.0 \
 -lglib-2.0 \
 -lgstreamer-1.0 \
+-lkmssdpagent \
+-lnice
 
 KMSELEMENTSIMPL_TARGET=libkmselementsimpl.dll
 
