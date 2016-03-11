@@ -31,6 +31,7 @@ CFLAGS= \
 -I../kms-core/src/gst-plugins/ \
 -I../kms-core/win32/server/implementation/generated-cpp/ \
 -I./win32/server/implementation/generated-cpp/ \
+-I./win32/gst-plugins/rtpendpoint/ \
 -I./win32/server/interface/generated-cpp/  \
 -I./src/gst-plugins/webrtcendpoint/ \
 -I./src/server/implementation/HttpServer/ \
