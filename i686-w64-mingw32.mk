@@ -33,6 +33,7 @@ CFLAGS= \
 -I./win32/server/implementation/generated-cpp/ \
 -I./win32/gst-plugins/rtpendpoint/ \
 -I./win32/server/interface/generated-cpp/  \
+-I./src/gst-plugins/rtpendpoint/ \
 -I./src/gst-plugins/webrtcendpoint/ \
 -I./src/server/implementation/HttpServer/ \
 -I./src/server/implementation/ \
