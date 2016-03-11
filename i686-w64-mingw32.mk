@@ -110,9 +110,23 @@ RTPENDPOINT_SRC= \
 ./src/gst-plugins/rtpendpoint/kmsrtpendpoint.c \
 ./src/gst-plugins/rtpendpoint/kmssocketutils.c \
 ./src/gst-plugins/rtpendpoint/kmsrandom.c \
-./win32/gst-plugins/rtpendpoint/kms-rtp-enumtypes.c
+./win32/gst-plugins/rtpendpoint/kms-rtp-enumtypes.c \
+./src/gst-plugins/rtpendpoint/kmsrtpbaseconnection.c \
 
-RTPENDPOINT_LIBS=
+RTPENDPOINT_LIBS= \
+-L/usr/i686-w64-mingw32/sys-root/mingw/lib \
+-L/usr/lib/gcc/i686-w64-mingw32/5.2.0 \
+-L/usr/i686-w64-mingw32/lib/ \
+-L../kms-core/build/ \
+-L./build/ \
+-lgobject-2.0 \
+-lglib-2.0 \
+-lgstreamer-1.0 \
+-lgstsdp-1.0.dll \
+-lkmssdpagent \
+-lkmsgstcommons \
+-lgio-2.0 \
+-lnice
 
 WEBRTCDATAPROTO_TARGET=libwebrtcdataproto.dll
 
