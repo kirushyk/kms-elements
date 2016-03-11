@@ -130,7 +130,7 @@ RTPENDPOINT_LIBS= \
 
 WEBRTCDATAPROTO_TARGET=libwebrtcdataproto.dll
 
-WEBRTCDATAPROTO_TARGET= \
+WEBRTCDATAPROTO_SRC= \
 ./src/gst-plugins/webrtcendpoint/kmswebrtcdatasessionbin.c \
 ./src/gst-plugins/webrtcendpoint/kmswebrtcdatachannelbin.c \
 ./src/gst-plugins/webrtcendpoint/kmswebrtcdatachannel.c \
