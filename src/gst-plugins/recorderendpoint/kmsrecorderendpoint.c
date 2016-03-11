@@ -276,6 +276,7 @@ recv_sample (GstAppSink * appsink, gpointer user_data)
 
   segment = gst_sample_get_segment (sample);
 
+  KMS_ELEMENT_LOCK (self);
   if (self->priv->moving_to_state != KMS_URI_ENDPOINT_STATE_START) {
     GST_WARNING ("Dropping buffer received in invalid state %" GST_PTR_FORMAT,
         buffer);
@@ -349,11 +350,13 @@ recv_sample (GstAppSink * appsink, gpointer user_data)
 
   if (ret != GST_FLOW_OK) {
     /* something wrong */
-    GST_ERROR ("Could not send buffer to appsrc %s. Cause: %s",
+    GST_ERROR_OBJECT (self, "Could not send buffer to appsrc %s. Cause: %s",
         GST_ELEMENT_NAME (appsrc), gst_flow_get_name (ret));
+    ret = GST_FLOW_CUSTOM_SUCCESS;
   }
 
 end:
+  KMS_ELEMENT_UNLOCK (self);
   if (sample != NULL) {
     gst_sample_unref (sample);
   }
@@ -373,6 +376,11 @@ static void
 kms_recorder_endpoint_change_state (KmsRecorderEndpoint * self,
     KmsUriEndpointState new_state)
 {
+  // TODO: check stopping and wait until stopping is set to false
+  if (self->priv->stopping) {
+    GST_WARNING_OBJECT (self, "Stopping is in progress, waif for it to finish");
+  }
+
   self->priv->moving_to_state = new_state;
 }
 
@@ -381,8 +389,10 @@ kms_recorder_endpoint_state_changed (KmsRecorderEndpoint * self,
     KmsUriEndpointState state)
 {
   KMS_ELEMENT_LOCK (KMS_ELEMENT (self));
-  KMS_URI_ENDPOINT_GET_CLASS (self)->change_state (KMS_URI_ENDPOINT (self),
-      state);
+  if (!self->priv->stopping || state == KMS_URI_ENDPOINT_STATE_STOP) {
+    KMS_URI_ENDPOINT_GET_CLASS (self)->change_state (KMS_URI_ENDPOINT (self),
+        state);
+  }
   KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
 }
 
@@ -395,19 +405,18 @@ send_eos_cb (gchar * id, GstElement * appsrc, gpointer user_data)
 static void
 kms_recorder_endpoint_send_eos_to_appsrcs (KmsRecorderEndpoint * self)
 {
-  KMS_ELEMENT_LOCK (KMS_ELEMENT (self));
-
   if (g_hash_table_size (self->priv->srcs) == 0) {
+    KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
     kms_base_media_muxer_set_state (self->priv->mux, GST_STATE_NULL);
-    goto end;
+    KMS_ELEMENT_LOCK (KMS_ELEMENT (self));
+    return;
   }
 
+  KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
   kms_base_media_muxer_set_state (self->priv->mux, GST_STATE_PLAYING);
+  KMS_ELEMENT_LOCK (KMS_ELEMENT (self));
 
   g_hash_table_foreach (self->priv->srcs, (GHFunc) send_eos_cb, NULL);
-
-end:
-  KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
 }
 
 static void
@@ -602,8 +611,8 @@ kms_recorder_endpoint_stopped (KmsUriEndpoint * obj)
   kms_recorder_endpoint_change_state (self, KMS_URI_ENDPOINT_STATE_STOP);
 
   if (kms_base_media_muxer_get_state (self->priv->mux) >= GST_STATE_PAUSED) {
-    kms_recorder_endpoint_send_eos_to_appsrcs (self);
     self->priv->stopping = TRUE;
+    kms_recorder_endpoint_send_eos_to_appsrcs (self);
   }
 
   kms_recorder_endpoint_remove_pads (self);
@@ -620,7 +629,9 @@ kms_recorder_endpoint_stopped (KmsUriEndpoint * obj)
 
   if (kms_base_media_muxer_get_state (self->priv->mux) < GST_STATE_PAUSED &&
       !self->priv->stopping) {
+    KMS_ELEMENT_UNLOCK (self);
     kms_base_media_muxer_set_state (self->priv->mux, GST_STATE_NULL);
+    KMS_ELEMENT_LOCK (self);
   }
 }
 
@@ -633,8 +644,10 @@ kms_recorder_endpoint_started (KmsUriEndpoint * obj)
 
   kms_recorder_endpoint_change_state (self, KMS_URI_ENDPOINT_STATE_START);
 
+  KMS_ELEMENT_UNLOCK (self);
   /* Set internal pipeline to playing */
   kms_base_media_muxer_set_state (self->priv->mux, GST_STATE_PLAYING);
+  KMS_ELEMENT_LOCK (self);
 
   BASE_TIME_LOCK (self);
 
@@ -660,6 +673,8 @@ kms_recorder_endpoint_paused (KmsUriEndpoint * obj)
 
   kms_recorder_endpoint_remove_pads (self);
 
+  KMS_ELEMENT_UNLOCK (self);
+
   /* Set internal pipeline to GST_STATE_PAUSED */
   kms_base_media_muxer_set_state (self->priv->mux, GST_STATE_PAUSED);
 
@@ -670,8 +685,6 @@ kms_recorder_endpoint_paused (KmsUriEndpoint * obj)
   if (clk) {
     self->priv->paused_start = gst_clock_get_time (clk);
   }
-
-  KMS_ELEMENT_UNLOCK (self);
 
   kms_recorder_endpoint_state_changed (self, KMS_URI_ENDPOINT_STATE_PAUSE);
 }
@@ -859,6 +872,8 @@ link_sinkpad_cb (GstPad * pad, GstPad * peer, gpointer user_data)
     return;
   }
 
+  gst_pad_set_element_private (pad, g_object_ref (appsrc));
+
   g_hash_table_insert (self->priv->srcs, id, g_object_ref (appsrc));
 
   if (sinkdata->sink_probe != 0UL) {
@@ -890,10 +905,20 @@ unlink_sinkpad_cb (GstPad * pad, GstPad * peer, gpointer user_data)
 {
   KmsRecorderEndpoint *self = KMS_RECORDER_ENDPOINT (user_data);
   gchar *id = NULL;
+  GstElement *appsrc;
 
   KMS_ELEMENT_LOCK (KMS_ELEMENT (self));
 
   id = gst_pad_get_name (pad);
+
+  GST_OBJECT_LOCK (pad);
+  appsrc = gst_pad_get_element_private (pad);
+  gst_pad_set_element_private (pad, NULL);
+
+  if (appsrc) {
+    g_object_unref (appsrc);
+  }
+  GST_OBJECT_UNLOCK (pad);
 
   if (self->priv->stopping) {
     GST_DEBUG_OBJECT (self, "Stop operation is pending");
@@ -1020,9 +1045,9 @@ kms_recorder_endpoint_on_eos (KmsBaseMediaMuxer * obj, gpointer user_data)
   GST_DEBUG_OBJECT (recorder,
       "Received EOS in muxing pipeline, setting NULL state");
 
-  KMS_ELEMENT_LOCK (KMS_ELEMENT (recorder));
-
   kms_base_media_muxer_set_state (recorder->priv->mux, GST_STATE_NULL);
+
+  KMS_ELEMENT_LOCK (KMS_ELEMENT (recorder));
 
   if (recorder->priv->stopping) {
     GST_WARNING_OBJECT (recorder, "Releasing pending pads");
@@ -1259,19 +1284,14 @@ kms_recorder_endpoint_query_caps (KmsElement * element, GstPad * pad,
   } else {
     GstElement *appsrc;
     GstPad *srcpad;
-    gchar *id;
 
-    id = gst_pad_get_name (pad);
-
-    KMS_ELEMENT_LOCK (KMS_ELEMENT (self));
-
-    appsrc = g_hash_table_lookup (self->priv->srcs, id);
-    g_free (id);
+    GST_OBJECT_LOCK (pad);
+    appsrc = gst_pad_get_element_private (pad);
 
     if (appsrc == NULL) {
       GstCaps *aux;
 
-      KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
+      GST_OBJECT_UNLOCK (pad);
       GST_INFO_OBJECT (self, "No appsrc attached to pad %" GST_PTR_FORMAT, pad);
 
       /* Filter against profile */
@@ -1283,7 +1303,7 @@ kms_recorder_endpoint_query_caps (KmsElement * element, GstPad * pad,
     }
     srcpad = gst_element_get_static_pad (appsrc, "src");
 
-    KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
+    GST_OBJECT_UNLOCK (pad);
 
     /* Get encodebin's caps filtering by profile */
     tcaps = gst_pad_peer_query_caps (srcpad, caps);
