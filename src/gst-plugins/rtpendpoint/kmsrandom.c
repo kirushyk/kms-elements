@@ -14,12 +14,16 @@
  */
 
 #include <unistd.h>
+#ifdef __linux__
 #include <sys/syscall.h>
 #include <linux/random.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#else
+#include <stdlib.h>
+#endif
 
 #include <glib.h>
 
@@ -67,6 +71,7 @@ error:
 }
 #endif
 
+#ifdef __linux__
 static gchar *
 file_gen_random_key (guint size)
 {
@@ -110,6 +115,24 @@ end:
 
   return key;
 }
+#endif
+
+#ifdef _WIN32
+static gchar *
+fallback_gen_random_key (guint size)
+{
+  gchar *key = NULL;
+  guint8 *buff = g_malloc0 (size);
+  int i;
+  for (int i = 0; i < size; i++)
+  {
+    buff[i] = rand() & 0xFF;
+  }
+  key = g_base64_encode (buff, size);
+  g_free (buff);
+  return key;
+}
+#endif
 
 gchar *
 generate_random_key (guint size)
@@ -124,7 +147,11 @@ generate_random_key (guint size)
     /* Fallback method: Try to read from /dev/random. This might */
     /* deal with security problems. Read LibreSSL portability    */
     /* reports regarding this issue. */
+#ifdef __linux__
     key = file_gen_random_key (size);
+#else
+    key = fallback_gen_random_key (size);
+#endif
   }
 
   return key;
