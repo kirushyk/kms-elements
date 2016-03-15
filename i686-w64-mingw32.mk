@@ -181,6 +181,7 @@ KMSWEBRTCENDPOINTLIB_LIBS= \
 -L/usr/i686-w64-mingw32/lib/ \
 -L../kms-core/build/ \
 -L./build/ \
+-lwebrtcdataproto.dll \
 -lgstsdp-1.0.dll \
 -lglibmm-2.4 \
 -lgobject-2.0 \
