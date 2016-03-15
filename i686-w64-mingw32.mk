@@ -224,18 +224,24 @@ KMSELEMENTSIMPL_LIBS= \
 -L../jsoncpp/build/ \
 -L../kms-core/build/ \
 -L./build/ \
--lsigc-2.0 \
--lglibmm-2.4 \
--lgobject-2.0 \
--lglib-2.0 \
--lgstreamer-1.0 \
+-lkmshttpep \
 -lkmswebrtcendpointlib.dll \
 -lkmselementsinterface \
 -lkmsgstcommons \
 -lkmscoreimpl.dll \
 -lkmsjsoncpp.dll \
 -lkmsjsonrpc.dll \
--lboost_system-mt
+-lsigc-2.0 \
+-lglibmm-2.4 \
+-lgobject-2.0 \
+-lglib-2.0 \
+-lgio-2.0 \
+-lgstreamer-1.0 \
+-lsoup-2.4.dll \
+-lboost_system-mt \
+-lrpcrt4 \
+-lole32 \
+-lnice
 
 KMSELEMENTSMODULE_TARGET=libkmselementsmodule.dll
 
@@ -300,7 +306,18 @@ $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET): $(KMSELEENTSMODULE_OBJS)
 
 .PHONY: clean
 clean:
-	rm -f $(TARGET_DIR)/$(KMSELEMENTS_TARGET)
+	rm -f $(KMSHTTPEP_C_OBJS)
+	rm -f $(KMSHTTPEP_CXX_OBJS)
+	rm -f $(TARGET_DIR)/$(KMSHTTPEP_TARGET)
+	rm -f $(RTPENDPOINT_OBJS)
+	rm -f $(TARGET_DIR)/$(RTPENDPOINT_TARGET)
+	rm -f $(TARGET_DIR)/$(RTPENDPOINT_TARGET).a
+	rm -f $(WEBRTCDATAPROTO_OBJS)
+	rm -f $(TARGET_DIR)/$(WEBRTCDATAPROTO_TARGET)
+	rm -f $(TARGET_DIR)/$(WEBRTCDATAPROTO_TARGET).a
+	rm -f $(KMSWEBRTCENDPOINTLIB_OBJS)
+	rm -f $(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET)
+	rm -f $(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET).a
 	rm -f $(KMSELEMENTSINTERFACE_OBJS)
 	rm -f $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET)
 	rm -f $(KMSELEMENTSIMPL_OBJS)
@@ -309,3 +326,4 @@ clean:
 	rm -f $(KMSELEMENTSMODULE_OBJS)
 	rm -f $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET)
 	rm -f $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET).a
+
