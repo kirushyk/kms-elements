@@ -137,6 +137,23 @@ WEBRTCDATAPROTO_SRC= \
 ./win32/gst-plugins/webrtcendpoint/kms-webrtc-enumtypes.c \
 ./win32/gst-plugins/webrtcendpoint/kms-webrtc-data-marshal.c
 
+WEBRTCDATAPROTO_LIBS= \
+-L/usr/i686-w64-mingw32/sys-root/mingw/lib \
+-L/usr/lib/gcc/i686-w64-mingw32/5.2.0 \
+-L/usr/i686-w64-mingw32/lib/ \
+-L../kms-core/build/ \
+-lkmsutils \
+-lkmssdpagent \
+-lgstsctp-1.0 \
+-lgstreamer-1.0 \
+-lgstvideo-1.0 \
+-lgstapp-1.0 \
+-lgobject-2.0 \
+-lglib-2.0 \
+-lgio-2.0 \
+-lrpcrt4 \
+-lole32
+
 KMSWEBRTCENDPOINTLIB_TARGET=libkmswebrtcendpointlib.dll
 
 KMSWEBRTCENDPOINTLIB_SRC= \
