@@ -33,6 +33,7 @@ CFLAGS= \
 -I./win32/server/implementation/generated-cpp/ \
 -I./win32/gst-plugins/rtpendpoint/ \
 -I./win32/server/interface/generated-cpp/  \
+-I./win32/gst-plugins/ \
 -I./src/gst-plugins/rtpendpoint/ \
 -I./src/gst-plugins/webrtcendpoint/ \
 -I./src/server/implementation/HttpServer/ \
@@ -258,6 +259,33 @@ KMSELEMENTSMODULE_LIBS= \
 -lkmselementsimpl.dll \
 -lkmscoreimpl.dll
 
+KMSELEMENTSPLUGINS_TARGET=libkmselementsplugins.dll
+
+KMSELEMENTSPLUGINS_SRC= \
+./src/gst-plugins/kmselements.c \
+./src/gst-plugins/kmshttpendpoint.c \
+./src/gst-plugins/kmshttppostendpoint.c \
+./src/gst-plugins/kmsplayerendpoint.c \
+./src/gst-plugins/kmsselectablemixer.c \
+./src/gst-plugins/kmsdispatcher.c \
+./src/gst-plugins/kmsdispatcheronetomany.c \
+./src/gst-plugins/kmscompositemixer.c \
+./src/gst-plugins/kmsalphablending.c \
+./win32/gst-plugins/kms-elements-marshal.c \
+./win32/gst-plugins/kms-elements-enumtypes.c
+
+KMSELEMENTSPLUGINS_LIBS= \
+-L/usr/i686-w64-mingw32/sys-root/mingw/lib \
+-L/usr/lib/gcc/i686-w64-mingw32/5.2.0 \
+-L/usr/i686-w64-mingw32/lib/ \
+-L../kms-core/build/ \
+-lgobject-2.0 \
+-lglib-2.0 \
+-lgstreamer-1.0 \
+-lgstapp-1.0.dll \
+-lkmsgstcommons \
+-lkmsrefstruct
+
 KMSHTTPEP_C_OBJS=$(KMSHTTPEP_C_SRC:.c=.o)
 KMSHTTPEP_CXX_OBJS=$(KMSHTTPEP_CXX_SRC:.cpp=.o)
 KMSELEMENTSINTERFACE_OBJS=$(KMSELEMENTSINTERFACE_SRC:.cpp=.o)
@@ -266,6 +294,7 @@ KMSELEMENTSIMPL_OBJS=$(KMSELEMENTSIMPL_SRC:.cpp=.o)
 RTPENDPOINT_OBJS=$(RTPENDPOINT_SRC:.c=.o)
 WEBRTCDATAPROTO_OBJS=$(WEBRTCDATAPROTO_SRC:.c=.o)
 KMSELEMENTSMODULE_OBJS=$(KMSELEMENTSMODULE_SRC:.cpp=.o)
+KMSELEMENTSPLUGINS_OBJS=$(KMSELEMENTSPLUGINS_SRC:.c=.o)
 
 all: \
 $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET) \
@@ -307,6 +336,10 @@ $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET): $(KMSELEMENTSMODULE_OBJS)
 	mkdir -p $(TARGET_DIR)
 	$(CXX) -shared -o $@ $(CFLAGS) $^ $(KMSELEMENTSMODULE_LIBS) -Wl,--out-implib,$@.a
 
+$(TARGET_DIR)/$(KMSELEMENTSPLUGINS_TARGET): $(KMSELEMENTSPLUGINS_OBJS)
+	mkdir -p $(TARGET_DIR)
+	$(CXX) -shared -o $@ $(CFLAGS) $^ $(KMSELEMENTSPLUGINS_LIBS)
+
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
 
@@ -335,4 +368,6 @@ clean:
 	rm -f $(KMSELEMENTSMODULE_OBJS)
 	rm -f $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET)
 	rm -f $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET).a
+	rm -f $(KMSELEMENTSPLUGINS_OBJS)
+	rm -f $(TARGET_DIR)/$(KMSELEMENTSPLUGINS_TARGET)
 
