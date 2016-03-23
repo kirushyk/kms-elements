@@ -46,6 +46,15 @@ CFLAGS= \
 -I./src/server/implementation/objects/ \
 -I./win32
 
+LIBS= \
+-L/usr/i686-w64-mingw32/sys-root/mingw/lib \
+-L/usr/lib/gcc/i686-w64-mingw32/5.2.0 \
+-L/usr/i686-w64-mingw32/lib/ \
+-L../kms-jsonrpc/build/ \
+-L../jsoncpp/build/ \
+-L../kms-core/build/ \
+-L./build/
+
 KMSHTTPEP_TARGET=libkmshttpep.a
 
 KMSHTTPEP_C_SRC= \
@@ -115,11 +124,6 @@ RTPENDPOINT_SRC= \
 ./src/gst-plugins/rtpendpoint/kmsrtpbaseconnection.c \
 
 RTPENDPOINT_LIBS= \
--L/usr/i686-w64-mingw32/sys-root/mingw/lib \
--L/usr/lib/gcc/i686-w64-mingw32/5.2.0 \
--L/usr/i686-w64-mingw32/lib/ \
--L../kms-core/build/ \
--L./build/ \
 -lgobject-2.0 \
 -lglib-2.0 \
 -lgstreamer-1.0 \
@@ -177,11 +181,6 @@ KMSWEBRTCENDPOINTLIB_SRC= \
 ./win32/gst-plugins/webrtcendpoint/kms-webrtc-data-marshal.c
 
 KMSWEBRTCENDPOINTLIB_LIBS= \
--L/usr/i686-w64-mingw32/sys-root/mingw/lib \
--L/usr/lib/gcc/i686-w64-mingw32/5.2.0 \
--L/usr/i686-w64-mingw32/lib/ \
--L../kms-core/build/ \
--L./build/ \
 -lwebrtcdataproto.dll \
 -lgstsdp-1.0.dll \
 -lglibmm-2.4 \
@@ -221,10 +220,6 @@ KMSELEMENTSIMPL_SRC= \
 ./win32/server/implementation/generated-cpp/AlphaBlendingImplInternal.cpp
 
 KMSELEMENTSIMPL_LIBS= \
--L../kms-jsonrpc/build/ \
--L../jsoncpp/build/ \
--L../kms-core/build/ \
--L./build/ \
 -lkmshttpep \
 -lkmswebrtcendpointlib.dll \
 -lkmselementsinterface \
@@ -254,8 +249,6 @@ KMSELEMENTSMODULE_SRC= \
 ./win32/server/module_generation_time.cpp
 
 KMSELEMENTSMODULE_LIBS= \
--L../kms-core/build/ \
--L./build/ \
 -lkmselementsimpl.dll \
 -lkmscoreimpl.dll
 
@@ -275,10 +268,6 @@ KMSELEMENTSPLUGINS_SRC= \
 ./win32/gst-plugins/kms-elements-enumtypes.c
 
 KMSELEMENTSPLUGINS_LIBS= \
--L/usr/i686-w64-mingw32/sys-root/mingw/lib \
--L/usr/lib/gcc/i686-w64-mingw32/5.2.0 \
--L/usr/i686-w64-mingw32/lib/ \
--L../kms-core/build/ \
 -lgobject-2.0 \
 -lglib-2.0 \
 -lgstreamer-1.0 \
@@ -318,27 +307,27 @@ $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET): $(KMSELEMENTSINTERFACE_OBJS)
 
 $(TARGET_DIR)/$(RTPENDPOINT_TARGET): $(RTPENDPOINT_OBJS)
 	mkdir -p $(TARGET_DIR)
-	$(CC) -shared -o $@ $(CFLAGS) $^ $(RTPENDPOINT_LIBS) -Wl,--out-implib,$@.a
+	$(CC) -shared -o $@ $(CFLAGS) $^ $(LIBS) $(RTPENDPOINT_LIBS) -Wl,--out-implib,$@.a
 
 $(TARGET_DIR)/$(WEBRTCDATAPROTO_TARGET): $(WEBRTCDATAPROTO_OBJS)
 	mkdir -p $(TARGET_DIR)
-	$(CC) -shared -o $@ $(CFLAGS) $^ $(WEBRTCDATAPROTO_LIBS) -Wl,--out-implib,$@.a
+	$(CC) -shared -o $@ $(CFLAGS) $^ $(LIBS) $(WEBRTCDATAPROTO_LIBS) -Wl,--out-implib,$@.a
 
 $(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET): $(KMSWEBRTCENDPOINTLIB_OBJS)
 	mkdir -p $(TARGET_DIR)
-	$(CC) -shared -o $@ $(CFLAGS) $^ $(KMSWEBRTCENDPOINTLIB_LIBS) -Wl,--out-implib,$@.a
+	$(CC) -shared -o $@ $(CFLAGS) $^ $(LIBS) $(KMSWEBRTCENDPOINTLIB_LIBS) -Wl,--out-implib,$@.a
 
 $(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET): $(KMSELEMENTSIMPL_OBJS)
 	mkdir -p $(TARGET_DIR)
-	$(CXX) -shared -o $@ $(CFLAGS) $^ $(KMSELEMENTSIMPL_LIBS) -Wl,--out-implib,$@.a
+	$(CXX) -shared -o $@ $(CFLAGS) $^ $(LIBS) $(KMSELEMENTSIMPL_LIBS) -Wl,--out-implib,$@.a
 
 $(TARGET_DIR)/$(KMSELEMENTSMODULE_TARGET): $(KMSELEMENTSMODULE_OBJS)
 	mkdir -p $(TARGET_DIR)
-	$(CXX) -shared -o $@ $(CFLAGS) $^ $(KMSELEMENTSMODULE_LIBS) -Wl,--out-implib,$@.a
+	$(CXX) -shared -o $@ $(CFLAGS) $^ $(LIBS) $(KMSELEMENTSMODULE_LIBS) -Wl,--out-implib,$@.a
 
 $(TARGET_DIR)/$(KMSELEMENTSPLUGINS_TARGET): $(KMSELEMENTSPLUGINS_OBJS)
 	mkdir -p $(TARGET_DIR)
-	$(CXX) -shared -o $@ $(CFLAGS) $^ $(KMSELEMENTSPLUGINS_LIBS)
+	$(CXX) -shared -o $@ $(CFLAGS) $^ $(LIBS) $(KMSELEMENTSPLUGINS_LIBS)
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
