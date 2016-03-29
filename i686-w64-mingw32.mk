@@ -41,10 +41,12 @@ CFLAGS= \
 -I./src/server/interface/ \
 -I./src/gst-plugins/ \
 -I./src/gst-plugins/commons/ \
+-I./src/gst-plugins/rtcpdemux/ \
 -I../jsoncpp/include/ \
 -I../kms-jsonrpc/src/ \
 -I./src/server/implementation/objects/ \
--I./win32
+-I./win32 \
+-I./win32/gst-plugins/rtcpdemux/
 
 LIBS= \
 -L/usr/i686-w64-mingw32/sys-root/mingw/lib \
@@ -275,9 +277,23 @@ KMSELEMENTSPLUGINS_LIBS= \
 -lkmsgstcommons \
 -lkmsrefstruct
 
+RTCPDEMUX_TARGET=librtcpdemux.dll
+
+RTCPDEMUX_SRC= \
+./src/gst-plugins/rtcpdemux/rtcpdemux.c \
+./src/gst-plugins/rtcpdemux/kmsrtcpdemux.c \
+./win32/gst-plugins/rtcpdemux/kms-marshal.c
+
+RTCPDEMUX_LIBS= \
+-lgobject-2.0 \
+-lglib-2.0 \
+-lgstreamer-1.0 \
+-lgstrtp-1.0.dll
+
 KMSHTTPEP_C_OBJS=$(KMSHTTPEP_C_SRC:.c=.o)
 KMSHTTPEP_CXX_OBJS=$(KMSHTTPEP_CXX_SRC:.cpp=.o)
 KMSELEMENTSINTERFACE_OBJS=$(KMSELEMENTSINTERFACE_SRC:.cpp=.o)
+RTCPDEMUX_OBJS=$(RTCPDEMUX_SRC:.c=.o)
 KMSWEBRTCENDPOINTLIB_OBJS=$(KMSWEBRTCENDPOINTLIB_SRC:.c=.o)
 KMSELEMENTSIMPL_OBJS=$(KMSELEMENTSIMPL_SRC:.cpp=.o)
 RTPENDPOINT_OBJS=$(RTPENDPOINT_SRC:.c=.o)
@@ -289,6 +305,7 @@ all: \
 $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET) \
 $(TARGET_DIR)/$(KMSHTTPEP_TARGET) \
 $(TARGET_DIR)/$(RTPENDPOINT_TARGET) \
+$(TARGET_DIR)/$(RTCPDEMUX_TARGET) \
 $(TARGET_DIR)/$(WEBRTCDATAPROTO_TARGET) \
 $(TARGET_DIR)/$(KMSWEBRTCENDPOINTLIB_TARGET) \
 $(TARGET_DIR)/$(KMSELEMENTSIMPL_TARGET) \
@@ -308,6 +325,10 @@ $(TARGET_DIR)/$(KMSELEMENTSINTERFACE_TARGET): $(KMSELEMENTSINTERFACE_OBJS)
 $(TARGET_DIR)/$(RTPENDPOINT_TARGET): $(RTPENDPOINT_OBJS)
 	mkdir -p $(TARGET_DIR)
 	$(CC) -shared -o $@ $(CFLAGS) $^ $(LIBS) $(RTPENDPOINT_LIBS) -Wl,--out-implib,$@.a
+
+$(TARGET_DIR)/$(RTCPDEMUX_TARGET): $(RTCPDEMUX_OBJS)
+	mkdir -p $(TARGET_DIR)
+	$(CC) -shared -o $@ $(CFLAGS) $^ $(LIBS) $(RTCPDEMUX_LIBS)
 
 $(TARGET_DIR)/$(WEBRTCDATAPROTO_TARGET): $(WEBRTCDATAPROTO_OBJS)
 	mkdir -p $(TARGET_DIR)
