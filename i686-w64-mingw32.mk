@@ -299,6 +299,11 @@ WEBRTCENDPOINT_LIBS= \
 -lgobject-2.0 \
 -lglib-2.0 \
 -lgstreamer-1.0 \
+-lwebrtcdataproto.dll \
+-lkmswebrtcendpointlib.dll \
+-lgstsdp-1.0.dll \
+-lkmsgstcommons \
+-lkmssdpagent
 
 KMSHTTPEP_C_OBJS=$(KMSHTTPEP_C_SRC:.c=.o)
 KMSHTTPEP_CXX_OBJS=$(KMSHTTPEP_CXX_SRC:.cpp=.o)
