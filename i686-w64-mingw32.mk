@@ -314,7 +314,15 @@ RECORDERENDPOINT_SRC= \
 ./src/gst-plugins/recorderendpoint/kmsksrmuxer.c \
 ./src/gst-plugins/recorderendpoint/kmsrecorderendpoint.c
 
-RECORDERENDPOINT_LIBS=
+RECORDERENDPOINT_LIBS= \
+-lgobject-2.0 \
+-lglib-2.0 \
+-lgstreamer-1.0 \
+-lgstapp-1.0 \
+-lkmsgstcommons \
+-lgstpbutils-1.0 \
+-lkmsrefstruct \
+-lwebrtcdataproto.dll
 
 KMSHTTPEP_C_OBJS=$(KMSHTTPEP_C_SRC:.c=.o)
 KMSHTTPEP_CXX_OBJS=$(KMSHTTPEP_CXX_SRC:.cpp=.o)
