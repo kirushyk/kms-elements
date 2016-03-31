@@ -841,6 +841,10 @@ kms_webrtc_session_generate_fingerprint_sdp_attr (KmsWebrtcSession * self,
       kms_webrtc_session_get_connection (self, mconf);
   gchar *pem = kms_webrtc_base_connection_get_certificate_pem (conn);
 
+  if (pem == NULL) {
+    return NULL;
+  }
+
   fp = generate_fingerprint_from_pem (pem);
   g_free (pem);
 
