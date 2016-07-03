@@ -974,7 +974,7 @@ register_end_point_cb (struct tmp_register_data *tdata)
 #ifdef _WIN32
   CoCreateGuid (&uuid);
   UuidToStringA (&uuid, &uuid_rpc_str);
-  uuid_str = g_strdup (uuid_rpc_str);
+  uuid_str = g_strdup ( (const gchar *) uuid_rpc_str);
   RpcStringFree (&uuid_rpc_str);
 #else
   uuid_generate (uuid);
