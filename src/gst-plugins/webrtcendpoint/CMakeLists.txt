@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+if (NOT (${CMAKE_SYSTEM_NAME} MATCHES "Windows"))
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+endif ()
 
 set(CUSTOM_PREFIX "kurento")
 set(INCLUDE_PREFIX "${CMAKE_INSTALL_INCLUDEDIR}/${CUSTOM_PREFIX}/webrtcendpoint")
