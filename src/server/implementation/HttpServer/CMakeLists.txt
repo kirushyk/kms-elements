@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -DHAVE_INTTYPES_H -std=c++0x")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wno-pedantic-ms-format -DHAVE_INTTYPES_H -std=gnu++11")
 
 include(GLibHelpers)
 
@@ -30,11 +30,15 @@ set(GEN_HEADERS
 add_glib_marshal(HTTP_EP_SOURCES HTTP_EP_HEADERS http-marshal http_marshal)
 add_glib_enumtypes(HTTP_EP_SOURCES HTTP_EP_HEADERS http-enumtypes KMS ${ENUM_HEADERS})
 
+if (NOT (${CMAKE_SYSTEM_NAME} MATCHES "Windows"))
+  set (CMAKE_C_FLAGS "-fPIC ${CMAKE_C_FLAGS}")
+endif ()
+
 add_library(kmshttpep ${HTTP_EP_SOURCES})
 
 set_target_properties(kmshttpep PROPERTIES
   PUBLIC_HEADER "${HTTP_EP_HEADERS}"
-  COMPILE_FLAGS "-fPIC -Wno-deprecated-declarations"
+  COMPILE_FLAGS "-Wno-deprecated-declarations"
 )
 
 include_directories(kmshttpep
