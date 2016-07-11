@@ -34,7 +34,7 @@ GST_DEBUG_CATEGORY_STATIC (GST_CAT_DEFAULT);
 namespace kurento
 {
 
-static const uint DEFAULT_STUN_PORT = 3478;
+static const unsigned DEFAULT_STUN_PORT = 3478;
 
 std::vector<std::string> supported_codecs = { "VP8", "opus", "PCMU" };
 
@@ -322,7 +322,7 @@ WebRtcEndpointImpl::WebRtcEndpointImpl (const boost::property_tree::ptree &conf,
                        std::dynamic_pointer_cast<MediaObjectImpl>
                        (mediaPipeline), FACTORY_NAME)
 {
-  uint stunPort;
+  unsigned stunPort;
   std::string stunAddress;
   std::string turnURL;
   std::string pemUri;
@@ -336,7 +336,7 @@ WebRtcEndpointImpl::WebRtcEndpointImpl (const boost::property_tree::ptree &conf,
 
   //set properties
   try {
-    stunPort = getConfigValue <uint, WebRtcEndpoint> ("stunServerPort");
+    stunPort = getConfigValue <unsigned, WebRtcEndpoint> ("stunServerPort");
   } catch (std::exception &e) {
     GST_INFO ("Setting default port %d to stun server. Reason: %s",
               DEFAULT_STUN_PORT, e.what() );
