@@ -123,10 +123,9 @@ fallback_gen_random_key (guint size)
 {
   gchar *key = NULL;
   guint8 *buff = g_malloc0 (size);
-  int i;
-  for (int i = 0; i < size; i++)
-  {
-    buff[i] = rand() & 0xFF;
+
+  for (int i = 0; i < size; i++) {
+    buff[i] = rand () & 0xFF;
   }
   key = g_base64_encode (buff, size);
   g_free (buff);
