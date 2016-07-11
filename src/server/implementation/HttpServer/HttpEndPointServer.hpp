@@ -13,7 +13,7 @@
  *
  */
 
-#ifndef __HTTP_END_POINT_SERVER_HPP__
+#ifndef __HTTP_END_POINT_SERVER_HPP__2
 #define __HTTP_END_POINT_SERVER_HPP__
 
 #include <gst/gst.h>
@@ -22,6 +22,10 @@
 #include <memory>
 
 #include "KmsHttpEPServer.h"
+
+#ifdef interface
+#undef interface
+#endif
 
 namespace kurento
 {
