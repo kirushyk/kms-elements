@@ -13,7 +13,7 @@
  *
  */
 
-#ifndef __HTTP_END_POINT_SERVER_HPP__2
+#ifndef __HTTP_END_POINT_SERVER_HPP__
 #define __HTTP_END_POINT_SERVER_HPP__
 
 #include <gst/gst.h>
