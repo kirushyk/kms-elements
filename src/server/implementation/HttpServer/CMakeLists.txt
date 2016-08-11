@@ -30,7 +30,7 @@ set(GEN_HEADERS
 add_glib_marshal(HTTP_EP_SOURCES HTTP_EP_HEADERS http-marshal http_marshal)
 add_glib_enumtypes(HTTP_EP_SOURCES HTTP_EP_HEADERS http-enumtypes KMS ${ENUM_HEADERS})
 
-add_library(kmshttpep ${HTTP_EP_SOURCES})
+add_library(kmshttpep STATIC ${HTTP_EP_SOURCES})
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   set (HTTP_EP_FLAGS "-Wno-pedantic-ms-format")
