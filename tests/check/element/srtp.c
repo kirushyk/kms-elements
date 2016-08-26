@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2015 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 #include <gst/check/gstcheck.h>
@@ -26,6 +28,8 @@
 #define PCMU_BUF_DURATION (PCMU_BUF_MS * GST_MSECOND)
 #define PCMU_BUF_SIZE (64000 * PCMU_BUF_MS / 1000)
 #define PCMU_RTP_TS_DURATION (PCMU_BUF_CLOCK_RATE * PCMU_BUF_MS / 1000)
+
+#define SRTP_REPLAY_WINDOW_SIZE G_MAXINT16      /* packets */
 
 /* based on rtpjitterbuffer.c */
 static GstCaps *
@@ -99,7 +103,37 @@ GST_START_TEST (test_window_size)
   fail_unless (ret == GST_FLOW_OK);
 
   ret = gst_harness_push (h, generate_test_buffer (0));
-  fail_unless (ret == GST_FLOW_ERROR);
+  fail_unless (ret == GST_FLOW_OK);
+
+  gst_harness_teardown (h);
+  g_object_unref (srtpenc);
+}
+
+GST_END_TEST;
+
+GST_START_TEST (test_allow_repeat_tx)
+{
+  GstElement *srtpenc = gst_element_factory_make ("srtpenc", NULL);
+  GstHarness *h;
+  GstFlowReturn ret;
+
+  g_object_set (srtpenc, "random-key", TRUE, "allow-repeat-tx", TRUE,
+      "replay-window-size", 64, NULL);
+  h = gst_harness_new_with_element (srtpenc, "rtp_sink_0", "rtp_src_0");
+
+  gst_harness_set_src_caps (h, generate_caps ());
+
+  ret = gst_harness_push (h, generate_test_buffer (0));
+  fail_unless (ret == GST_FLOW_OK);
+
+  ret = gst_harness_push (h, generate_test_buffer (1));
+  fail_unless (ret == GST_FLOW_OK);
+
+  ret = gst_harness_push (h, generate_test_buffer (65));
+  fail_unless (ret == GST_FLOW_OK);
+
+  ret = gst_harness_push (h, generate_test_buffer (1));
+  fail_unless (ret == GST_FLOW_OK);
 
   gst_harness_teardown (h);
   g_object_unref (srtpenc);
@@ -115,6 +149,7 @@ srtp_suite (void)
 
   suite_add_tcase (s, tc_chain);
   tcase_add_test (tc_chain, test_window_size);
+  tcase_add_test (tc_chain, test_allow_repeat_tx);
 
   return s;
 }

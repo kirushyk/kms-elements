@@ -103,6 +103,8 @@ set(KMS_WEBRTC_HEADERS
   kmswebrtcsctpconnection.h
   kmswebrtctransportsrc.h
   kmswebrtctransportsink.h
+  kmswebrtctransportsrcnice.h
+  kmswebrtctransportsinknice.h
   kmswebrtctransport.h
   kmswebrtcsession.h
   kmswebrtcendpoint.h
@@ -112,7 +114,8 @@ set(KMS_WEBRTC_HEADERS
 add_glib_marshal(KMS_WEBRTC_SOURCES KMS_WEBRTC_HEADERS kms-webrtc-marshal __kms_webrtc_marshal)
 
 add_library(kmswebrtcendpointlib SHARED ${KMS_WEBRTC_SOURCES} ${KMS_WEBRTC_HEADERS})
-add_dependencies(kmswebrtcendpointlib rtcpdemux webrtcdataproto)
+add_dependencies(kmswebrtcendpointlib rtcpdemux webrtcdata
+proto)
 
 target_link_libraries(kmswebrtcendpointlib
   webrtcdataproto

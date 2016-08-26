@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2013 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -28,8 +30,11 @@
 
 /* Temporaly disabled */
 #if 0
-#define CLIENT_RECEIVES "offerer_receives"
-#define SERVER_RECEIVES "answerer_receives"
+#define CLIENT_RECEIVES "client-receives"
+G_DEFINE_QUARK (CLIENT_RECEIVES, client_receives);
+
+#define SERVER_RECEIVES "server-receives"
+G_DEFINE_QUARK (SERVER_RECEIVES, server_receives);
 
 G_LOCK_DEFINE_STATIC (check_receive_lock);
 #endif /* Temporaly disabled */
@@ -128,12 +133,12 @@ fakesink_dtls_client_hand_off (GstElement * fakesink, GstBuffer * buf,
   GST_INFO_OBJECT (fakesink, "BUF received");
 
   G_LOCK (check_receive_lock);
-  if (GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline),
-              SERVER_RECEIVES))) {
+  if (GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+              server_receives_quark ()))) {
     g_object_set (G_OBJECT (fakesink), "signal-handoffs", FALSE, NULL);
     g_idle_add (quit_main_loop, loop);
   } else {
-    g_object_set_data (G_OBJECT (pipeline), CLIENT_RECEIVES,
+    g_object_set_qdata (G_OBJECT (pipeline), client_receives_quark (),
         GINT_TO_POINTER (TRUE));
   }
   G_UNLOCK (check_receive_lock);
@@ -150,12 +155,12 @@ fakesink_dtls_server_hand_off (GstElement * fakesink, GstBuffer * buf,
   GST_INFO_OBJECT (fakesink, "BUF received");
 
   G_LOCK (check_receive_lock);
-  if (GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline),
-              CLIENT_RECEIVES))) {
+  if (GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+              client_receives_quark ()))) {
     g_object_set (G_OBJECT (fakesink), "signal-handoffs", FALSE, NULL);
     g_idle_add (quit_main_loop, loop);
   } else {
-    g_object_set_data (G_OBJECT (pipeline), SERVER_RECEIVES,
+    g_object_set_qdata (G_OBJECT (pipeline), server_receives_quark (),
         GINT_TO_POINTER (TRUE));
   }
   G_UNLOCK (check_receive_lock);

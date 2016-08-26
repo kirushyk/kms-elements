@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2013 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -25,8 +27,11 @@
 #define KMS_VIDEO_PREFIX "video_src_"
 #define KMS_AUDIO_PREFIX "audio_src_"
 
-#define AUDIO_SINK "audio-sink"
 #define VIDEO_SINK "video-sink"
+G_DEFINE_QUARK (VIDEO_SINK, video_sink);
+
+#define LOOP "loop"
+G_DEFINE_QUARK (LOOP, loop);
 
 #define AUDIO_BW 30
 #define VIDEO_BW 500
@@ -118,11 +123,11 @@ connect_sink_on_srcpad_added (GstElement * element, GstPad * pad,
   GstPad *sinkpad;
 
   if (g_str_has_prefix (GST_PAD_NAME (pad), KMS_AUDIO_PREFIX)) {
-    GST_DEBUG_OBJECT (pad, "Connecting video stream");
-    sink = g_object_get_data (G_OBJECT (element), AUDIO_SINK);
+    GST_ERROR_OBJECT (pad, "Not connecting audio stream, it is not expected");
+    return;
   } else if (g_str_has_prefix (GST_PAD_NAME (pad), KMS_VIDEO_PREFIX)) {
-    GST_DEBUG_OBJECT (pad, "Connecting audio stream");
-    sink = g_object_get_data (G_OBJECT (element), VIDEO_SINK);
+    GST_DEBUG_OBJECT (pad, "Connecting video stream");
+    sink = g_object_get_qdata (G_OBJECT (element), video_sink_quark ());
   } else {
     GST_TRACE_OBJECT (pad, "Not src pad type");
     return;
@@ -223,7 +228,7 @@ GST_START_TEST (loopback)
   GstBus *bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
   int handler_id;
 
-  g_object_set_data (G_OBJECT (pipeline), "loop", loop);
+  g_object_set_qdata (G_OBJECT (pipeline), loop_quark (), loop);
 
   gst_bus_add_watch (bus, gst_bus_async_signal_func, NULL);
   handler_id =
@@ -244,7 +249,7 @@ GST_START_TEST (loopback)
   connect_sink_async (rtpendpointsender, agnosticbin, pipeline,
       SINK_VIDEO_STREAM);
 
-  g_object_set_data (G_OBJECT (rtpendpointreceiver), VIDEO_SINK,
+  g_object_set_qdata (G_OBJECT (rtpendpointreceiver), video_sink_quark (),
       outputfakesink);
   g_signal_connect (rtpendpointreceiver, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);

@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2013 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -26,7 +28,13 @@
 #define SINK_AUDIO_STREAM "sink_audio_default"
 
 #define AUDIO_SINK "audio-sink"
-#define VIDEO_SINK "video-sink"
+G_DEFINE_QUARK (AUDIO_SINK, audio_sink);
+
+#define OFFERER_RECEIVES_AUDIO "offerer-receives-audio"
+G_DEFINE_QUARK (OFFERER_RECEIVES_AUDIO, offerer_receives_audio);
+
+#define ANSWERER_RECEIVES_AUDIO "answerer-receives-audio"
+G_DEFINE_QUARK (ANSWERER_RECEIVES_AUDIO, answerer_receives_audio);
 
 #define KMS_RTP_SDES_CRYPTO_SUITE_AES_128_CM_HMAC_SHA1_32 0
 #define KMS_RTP_SDES_CRYPTO_SUITE_AES_128_CM_HMAC_SHA1_80 1
@@ -169,11 +177,11 @@ connect_sink_on_srcpad_added (GstElement * element, GstPad * pad,
   GstPad *sinkpad;
 
   if (g_str_has_prefix (GST_PAD_NAME (pad), KMS_AUDIO_PREFIX)) {
-    GST_DEBUG_OBJECT (pad, "Connecting video stream");
-    sink = g_object_get_data (G_OBJECT (element), AUDIO_SINK);
-  } else if (g_str_has_prefix (GST_PAD_NAME (pad), KMS_VIDEO_PREFIX)) {
     GST_DEBUG_OBJECT (pad, "Connecting audio stream");
-    sink = g_object_get_data (G_OBJECT (element), VIDEO_SINK);
+    sink = g_object_get_qdata (G_OBJECT (element), audio_sink_quark ());
+  } else if (g_str_has_prefix (GST_PAD_NAME (pad), KMS_VIDEO_PREFIX)) {
+    GST_ERROR_OBJECT (pad, "Not connecting video stream, it is not expected");
+    return;
   } else {
     GST_TRACE_OBJECT (pad, "Not src pad type");
     return;
@@ -343,7 +351,7 @@ test_audio_sendonly (const gchar * audio_enc_name, GstStaticCaps expected_caps,
   gst_sdp_message_free (answer);
 
   gst_bin_add (GST_BIN (pipeline), outputfakesink);
-  g_object_set_data (G_OBJECT (rtpendpointreceiver), AUDIO_SINK,
+  g_object_set_qdata (G_OBJECT (rtpendpointreceiver), audio_sink_quark (),
       outputfakesink);
   g_signal_connect (rtpendpointreceiver, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
@@ -372,9 +380,6 @@ test_audio_sendonly (const gchar * audio_enc_name, GstStaticCaps expected_caps,
   g_free (receiver_sess_id);
 }
 
-#define OFFERER_RECEIVES_AUDIO "offerer_receives_audio"
-#define ANSWERER_RECEIVES_AUDIO "answerer_receives_audio"
-
 G_LOCK_DEFINE_STATIC (check_receive_lock);
 
 static void
@@ -389,12 +394,12 @@ sendrecv_offerer_fakesink_hand_off (GstElement * fakesink, GstBuffer * buf,
   pipeline = GST_ELEMENT (gst_element_get_parent (fakesink));
 
   G_LOCK (check_receive_lock);
-  if (GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline),
-              ANSWERER_RECEIVES_AUDIO))) {
+  if (GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+              answerer_receives_audio_quark ()))) {
     g_object_set (G_OBJECT (fakesink), "signal-handoffs", FALSE, NULL);
     g_idle_add (quit_main_loop_idle, hod->loop);
   } else {
-    g_object_set_data (G_OBJECT (pipeline), OFFERER_RECEIVES_AUDIO,
+    g_object_set_qdata (G_OBJECT (pipeline), offerer_receives_audio_quark (),
         GINT_TO_POINTER (TRUE));
   }
   G_UNLOCK (check_receive_lock);
@@ -414,12 +419,12 @@ sendrecv_answerer_fakesink_hand_off (GstElement * fakesink, GstBuffer * buf,
   pipeline = GST_ELEMENT (gst_element_get_parent (fakesink));
 
   G_LOCK (check_receive_lock);
-  if (GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline),
-              OFFERER_RECEIVES_AUDIO))) {
+  if (GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+              offerer_receives_audio_quark ()))) {
     g_object_set (G_OBJECT (fakesink), "signal-handoffs", FALSE, NULL);
     g_idle_add (quit_main_loop_idle, hod->loop);
   } else {
-    g_object_set_data (G_OBJECT (pipeline), ANSWERER_RECEIVES_AUDIO,
+    g_object_set_qdata (G_OBJECT (pipeline), answerer_receives_audio_quark (),
         GINT_TO_POINTER (TRUE));
   }
   G_UNLOCK (check_receive_lock);
@@ -491,13 +496,15 @@ test_audio_sendrecv (const gchar * audio_enc_name,
   g_signal_connect (G_OBJECT (fakesink_answerer), "handoff",
       G_CALLBACK (sendrecv_answerer_fakesink_hand_off), hod);
 
-  g_object_set_data (G_OBJECT (offerer), AUDIO_SINK, fakesink_offerer);
+  g_object_set_qdata (G_OBJECT (offerer), audio_sink_quark (),
+      fakesink_offerer);
   g_signal_connect (offerer, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
   fail_unless (kms_element_request_srcpad (offerer,
           KMS_ELEMENT_PAD_TYPE_AUDIO));
 
-  g_object_set_data (G_OBJECT (answerer), AUDIO_SINK, fakesink_answerer);
+  g_object_set_qdata (G_OBJECT (answerer), audio_sink_quark (),
+      fakesink_answerer);
   g_signal_connect (answerer, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
   fail_unless (kms_element_request_srcpad (answerer,

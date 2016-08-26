@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2013 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -167,14 +169,6 @@ kms_webrtc_endpoint_link_pads (GstPad * src, GstPad * sink)
   }
 }
 
-static void
-on_data_pads_removed (KmsWebrtcSession * sess, guint stream_id,
-    KmsWebrtcEndpoint * self)
-{
-  kms_element_remove_sink_by_type (KMS_ELEMENT (self),
-      KMS_ELEMENT_PAD_TYPE_DATA);
-}
-
 static gboolean
 kms_webrtc_endpoint_add_data_sink_pad (KmsWebrtcEndpoint * self,
     GstPad * target, const gchar * description)
@@ -310,7 +304,7 @@ kms_webrtc_endpoint_create_session_internal (KmsBaseSdpEndpoint * base_sdp,
       webrtc_sess, "stun-server-port", G_BINDING_DEFAULT);
   g_object_bind_property (self, "turn-url",
       webrtc_sess, "turn-url", G_BINDING_DEFAULT);
-  g_object_bind_property (self, "pem_certificate",
+  g_object_bind_property (self, "pem-certificate",
       webrtc_sess, "pem-certificate", G_BINDING_DEFAULT);
 
   g_object_set (webrtc_sess, "stun-server", self->priv->stun_server_ip,
@@ -333,9 +327,6 @@ kms_webrtc_endpoint_create_session_internal (KmsBaseSdpEndpoint * base_sdp,
       G_CALLBACK (on_data_channel_opened), self);
   g_signal_connect (webrtc_sess, "data-channel-closed",
       G_CALLBACK (on_data_channel_closed), self);
-
-  g_signal_connect (webrtc_sess, "data-pads-remove",
-      G_CALLBACK (on_data_pads_removed), self);
 
   *sess = KMS_SDP_SESSION (webrtc_sess);
 
@@ -870,5 +861,5 @@ GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     kmswebrtcendpoint,
     "Kurento webrtc endpoint",
-    kms_webrtc_endpoint_plugin_init, VERSION, "LGPL",
+    kms_webrtc_endpoint_plugin_init, VERSION, GST_LICENSE_UNKNOWN,
     "Kurento Elements", "http://kurento.com/")

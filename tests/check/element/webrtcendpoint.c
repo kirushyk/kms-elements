@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2013 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -23,7 +25,10 @@
 #define KMS_AUDIO_PREFIX "audio_src_"
 
 #define AUDIO_SINK "audio-sink"
+G_DEFINE_QUARK (AUDIO_SINK, audio_sink);
+
 #define VIDEO_SINK "video-sink"
+G_DEFINE_QUARK (VIDEO_SINK, video_sink);
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -85,7 +90,7 @@ bus_msg (GstBus * bus, GstMessage * msg, gpointer pipe)
 
 typedef struct HandOffData
 {
-  const gchar *type;
+  GQuark type;
   GMainLoop *loop;
   GstStaticCaps expected_caps;
 
@@ -176,8 +181,11 @@ fakesink_hand_off (GstElement * fakesink, GstBuffer * buf, GstPad * pad,
   }
 }
 
-#define RECEIVER_1_OK "offerer_receives"
-#define RECEIVER_2_OK "answerer_receives"
+#define OFFERER_RECEIVES "offerer-receives"
+G_DEFINE_QUARK (OFFERER_RECEIVES, offerer_receives);
+
+#define ANSWERER_RECEIVES "answerer-receives"
+G_DEFINE_QUARK (ANSWERER_RECEIVES, answerer_receives);
 
 G_LOCK_DEFINE_STATIC (check_receive_lock);
 
@@ -204,10 +212,11 @@ receiver_1_fakesink_hand_off (GstElement * fakesink, GstBuffer * buf,
   G_LOCK (check_receive_lock);
   g_object_set (G_OBJECT (fakesink), "signal-handoffs", FALSE, NULL);
 
-  if (GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline), RECEIVER_2_OK))) {
+  if (GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+              answerer_receives_quark ()))) {
     g_idle_add (quit_main_loop_idle, hod->loop);
   } else {
-    g_object_set_data (G_OBJECT (pipeline), RECEIVER_1_OK,
+    g_object_set_qdata (G_OBJECT (pipeline), offerer_receives_quark (),
         GINT_TO_POINTER (TRUE));
   }
   G_UNLOCK (check_receive_lock);
@@ -238,10 +247,11 @@ receiver_2_fakesink_hand_off (GstElement * fakesink, GstBuffer * buf,
   G_LOCK (check_receive_lock);
   g_object_set (G_OBJECT (fakesink), "signal-handoffs", FALSE, NULL);
 
-  if (GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline), RECEIVER_1_OK))) {
+  if (GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+              offerer_receives_quark ()))) {
     g_idle_add (quit_main_loop_idle, hod->loop);
   } else {
-    g_object_set_data (G_OBJECT (pipeline), RECEIVER_2_OK,
+    g_object_set_qdata (G_OBJECT (pipeline), answerer_receives_quark (),
         GINT_TO_POINTER (TRUE));
   }
   G_UNLOCK (check_receive_lock);
@@ -310,10 +320,10 @@ connect_sink_on_srcpad_added (GstElement * element, GstPad * pad,
 
   if (g_str_has_prefix (GST_PAD_NAME (pad), KMS_AUDIO_PREFIX)) {
     GST_DEBUG_OBJECT (pad, "Connecting audio stream");
-    sink = g_object_get_data (G_OBJECT (element), AUDIO_SINK);
+    sink = g_object_get_qdata (G_OBJECT (element), audio_sink_quark ());
   } else if (g_str_has_prefix (GST_PAD_NAME (pad), KMS_VIDEO_PREFIX)) {
     GST_DEBUG_OBJECT (pad, "Connecting video stream");
-    sink = g_object_get_data (G_OBJECT (element), VIDEO_SINK);
+    sink = g_object_get_qdata (G_OBJECT (element), video_sink_quark ());
   } else {
     GST_TRACE_OBJECT (pad, "Not src pad type");
     return;
@@ -364,7 +374,8 @@ connect_sink_async (GstElement * webrtcendpoint, GstElement * src,
 static void
 test_video_sendonly (const gchar * video_enc_name, GstStaticCaps expected_caps,
     gchar * codec, gboolean bundle,
-    gboolean check_request_local_key_frame, gboolean gather_asap)
+    gboolean check_request_local_key_frame, gboolean gather_asap,
+    const gchar * pem)
 {
   GArray *codecs_array;
   gchar *codecs[] = { codec, NULL };
@@ -387,6 +398,11 @@ test_video_sendonly (const gchar * video_enc_name, GstStaticCaps expected_caps,
 
   gst_bus_add_signal_watch (bus);
   g_signal_connect (bus, "message", G_CALLBACK (bus_msg), pipeline);
+
+  if (pem != NULL) {
+    g_object_set (sender, "pem-certificate", pem, NULL);
+    g_object_set (receiver, "pem-certificate", pem, NULL);
+  }
 
   codecs_array = create_codecs_array (codecs);
   g_object_set (sender, "num-video-medias", 1, "video-codecs",
@@ -500,7 +516,7 @@ test_video_sendonly (const gchar * video_enc_name, GstStaticCaps expected_caps,
   fail_unless (ret);
 
   gst_bin_add (GST_BIN (pipeline), outputfakesink);
-  g_object_set_data (G_OBJECT (receiver), VIDEO_SINK, outputfakesink);
+  g_object_set_qdata (G_OBJECT (receiver), video_sink_quark (), outputfakesink);
   g_signal_connect (receiver, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
   fail_unless (kms_element_request_srcpad (receiver,
@@ -637,13 +653,15 @@ test_video_sendrecv (const gchar * video_enc_name,
   gst_bin_add_many (GST_BIN (pipeline), fakesink_offerer, fakesink_answerer,
       NULL);
 
-  g_object_set_data (G_OBJECT (offerer), VIDEO_SINK, fakesink_offerer);
+  g_object_set_qdata (G_OBJECT (offerer), video_sink_quark (),
+      fakesink_offerer);
   g_signal_connect (offerer, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
   fail_unless (kms_element_request_srcpad (offerer,
           KMS_ELEMENT_PAD_TYPE_VIDEO));
 
-  g_object_set_data (G_OBJECT (answerer), VIDEO_SINK, fakesink_answerer);
+  g_object_set_qdata (G_OBJECT (answerer), video_sink_quark (),
+      fakesink_answerer);
   g_signal_connect (answerer, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
   fail_unless (kms_element_request_srcpad (answerer,
@@ -792,13 +810,15 @@ test_audio_sendrecv (const gchar * audio_enc_name,
   gst_bin_add_many (GST_BIN (pipeline), fakesink_offerer, fakesink_answerer,
       NULL);
 
-  g_object_set_data (G_OBJECT (offerer), AUDIO_SINK, fakesink_offerer);
+  g_object_set_qdata (G_OBJECT (offerer), audio_sink_quark (),
+      fakesink_offerer);
   g_signal_connect (offerer, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
   fail_unless (kms_element_request_srcpad (offerer,
           KMS_ELEMENT_PAD_TYPE_AUDIO));
 
-  g_object_set_data (G_OBJECT (answerer), AUDIO_SINK, fakesink_answerer);
+  g_object_set_qdata (G_OBJECT (answerer), audio_sink_quark (),
+      fakesink_answerer);
   g_signal_connect (answerer, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
   fail_unless (kms_element_request_srcpad (answerer,
@@ -824,22 +844,29 @@ test_audio_sendrecv (const gchar * audio_enc_name,
   g_free (answerer_sess_id);
 }
 
-#define OFFERER_RECEIVES_AUDIO "offerer_receives_audio"
-#define OFFERER_RECEIVES_VIDEO "offerer_receives_video"
-#define ANSWERER_RECEIVES_AUDIO "answerer_receives_audio"
-#define ANSWERER_RECEIVES_VIDEO "answerer_receives_video"
+#define OFFERER_RECEIVES_AUDIO "offerer-receives-audio"
+G_DEFINE_QUARK (OFFERER_RECEIVES_AUDIO, offerer_receives_audio);
+
+#define OFFERER_RECEIVES_VIDEO "offerer-receives-video"
+G_DEFINE_QUARK (OFFERER_RECEIVES_VIDEO, offerer_receives_video);
+
+#define ANSWERER_RECEIVES_AUDIO "answerer-receives-audio"
+G_DEFINE_QUARK (ANSWERER_RECEIVES_AUDIO, answerer_receives_audio);
+
+#define ANSWERER_RECEIVES_VIDEO "answerer-receives-video"
+G_DEFINE_QUARK (ANSWERER_RECEIVES_VIDEO, answerer_receives_video);
 
 static gboolean
 check_offerer_and_answerer_receive_audio_and_video (gpointer pipeline)
 {
-  return GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline),
-          OFFERER_RECEIVES_AUDIO)) &&
-      GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline),
-          OFFERER_RECEIVES_VIDEO)) &&
-      GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline),
-          ANSWERER_RECEIVES_AUDIO)) &&
-      GPOINTER_TO_INT (g_object_get_data (G_OBJECT (pipeline),
-          ANSWERER_RECEIVES_VIDEO));
+  return GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+          offerer_receives_audio_quark ())) &&
+      GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+          offerer_receives_video_quark ())) &&
+      GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+          answerer_receives_audio_quark ())) &&
+      GPOINTER_TO_INT (g_object_get_qdata (G_OBJECT (pipeline),
+          answerer_receives_video_quark ()));
 }
 
 static void
@@ -856,7 +883,7 @@ sendrecv_fakesink_hand_off (GstElement * fakesink,
   pipeline = GST_ELEMENT (gst_element_get_parent (fakesink));
 
   G_LOCK (check_receive_lock);
-  g_object_set_data (G_OBJECT (pipeline), hod->type, GINT_TO_POINTER (TRUE));
+  g_object_set_qdata (G_OBJECT (pipeline), hod->type, GINT_TO_POINTER (TRUE));
   g_object_set (G_OBJECT (fakesink), "signal-handoffs", FALSE, NULL);
 
   if (check_offerer_and_answerer_receive_audio_and_video (pipeline)) {
@@ -937,13 +964,13 @@ test_audio_video_sendonly_recvonly (const gchar * audio_enc_name,
       G_CALLBACK (on_ice_candidate), receiver_cand_data);
 
   /* Hack to avoid audio and video reception in sender(offerer) */
-  g_object_set_data (G_OBJECT (pipeline), OFFERER_RECEIVES_AUDIO,
+  g_object_set_qdata (G_OBJECT (pipeline), offerer_receives_audio_quark (),
       GINT_TO_POINTER (TRUE));
-  g_object_set_data (G_OBJECT (pipeline), OFFERER_RECEIVES_VIDEO,
+  g_object_set_qdata (G_OBJECT (pipeline), offerer_receives_video_quark (),
       GINT_TO_POINTER (TRUE));
 
   hod_audio = g_slice_new0 (HandOffData);
-  hod_audio->type = ANSWERER_RECEIVES_AUDIO;
+  hod_audio->type = answerer_receives_audio_quark ();
   hod_audio->expected_caps = audio_expected_caps;
   hod_audio->loop = loop;
   g_object_set (G_OBJECT (audio_fakesink), "signal-handoffs", TRUE, NULL);
@@ -951,7 +978,7 @@ test_audio_video_sendonly_recvonly (const gchar * audio_enc_name,
       G_CALLBACK (sendrecv_fakesink_hand_off), hod_audio);
 
   hod_video = g_slice_new0 (HandOffData);
-  hod_video->type = ANSWERER_RECEIVES_VIDEO;
+  hod_video->type = answerer_receives_video_quark ();
   hod_video->expected_caps = video_expected_caps;
   hod_video->loop = loop;
   g_object_set (G_OBJECT (video_fakesink), "signal-handoffs", TRUE, NULL);
@@ -1005,14 +1032,14 @@ test_audio_video_sendonly_recvonly (const gchar * audio_enc_name,
   fail_unless (ret);
 
   gst_bin_add (GST_BIN (pipeline), audio_fakesink);
-  g_object_set_data (G_OBJECT (receiver), AUDIO_SINK, audio_fakesink);
+  g_object_set_qdata (G_OBJECT (receiver), audio_sink_quark (), audio_fakesink);
   g_signal_connect (receiver, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
   fail_unless (kms_element_request_srcpad (receiver,
           KMS_ELEMENT_PAD_TYPE_AUDIO));
 
   gst_bin_add (GST_BIN (pipeline), video_fakesink);
-  g_object_set_data (G_OBJECT (receiver), VIDEO_SINK, video_fakesink);
+  g_object_set_qdata (G_OBJECT (receiver), video_sink_quark (), video_fakesink);
   fail_unless (kms_element_request_srcpad (receiver,
           KMS_ELEMENT_PAD_TYPE_VIDEO));
 
@@ -1130,7 +1157,7 @@ test_audio_video_sendrecv (const gchar * audio_enc_name,
       G_CALLBACK (on_ice_candidate), &answerer_cand_data);
 
   hod_audio_offerer = g_slice_new0 (HandOffData);
-  hod_audio_offerer->type = OFFERER_RECEIVES_AUDIO;
+  hod_audio_offerer->type = offerer_receives_audio_quark ();
   hod_audio_offerer->expected_caps = audio_expected_caps;
   hod_audio_offerer->loop = loop;
   g_object_set (G_OBJECT (audio_fakesink_offerer), "signal-handoffs", TRUE,
@@ -1139,7 +1166,7 @@ test_audio_video_sendrecv (const gchar * audio_enc_name,
       G_CALLBACK (sendrecv_fakesink_hand_off), hod_audio_offerer);
 
   hod_video_offerer = g_slice_new0 (HandOffData);
-  hod_video_offerer->type = OFFERER_RECEIVES_VIDEO;
+  hod_video_offerer->type = offerer_receives_video_quark ();
   hod_video_offerer->expected_caps = video_expected_caps;
   hod_video_offerer->loop = loop;
   g_object_set (G_OBJECT (video_fakesink_offerer), "signal-handoffs", TRUE,
@@ -1148,7 +1175,7 @@ test_audio_video_sendrecv (const gchar * audio_enc_name,
       G_CALLBACK (sendrecv_fakesink_hand_off), hod_video_offerer);
 
   hod_audio_answerer = g_slice_new0 (HandOffData);
-  hod_audio_answerer->type = ANSWERER_RECEIVES_AUDIO;
+  hod_audio_answerer->type = answerer_receives_audio_quark ();
   hod_audio_answerer->expected_caps = audio_expected_caps;
   hod_audio_answerer->loop = loop;
   g_object_set (G_OBJECT (audio_fakesink_answerer), "signal-handoffs", TRUE,
@@ -1157,7 +1184,7 @@ test_audio_video_sendrecv (const gchar * audio_enc_name,
       G_CALLBACK (sendrecv_fakesink_hand_off), hod_audio_answerer);
 
   hod_video_answerer = g_slice_new0 (HandOffData);
-  hod_video_answerer->type = ANSWERER_RECEIVES_VIDEO;
+  hod_video_answerer->type = answerer_receives_video_quark ();
   hod_video_answerer->expected_caps = video_expected_caps;
   hod_video_answerer->loop = loop;
   g_object_set (G_OBJECT (video_fakesink_answerer), "signal-handoffs", TRUE,
@@ -1224,20 +1251,24 @@ test_audio_video_sendrecv (const gchar * audio_enc_name,
   g_signal_connect (answerer, "pad-added",
       G_CALLBACK (connect_sink_on_srcpad_added), NULL);
 
-  g_object_set_data (G_OBJECT (offerer), AUDIO_SINK, audio_fakesink_offerer);
+  g_object_set_qdata (G_OBJECT (offerer), audio_sink_quark (),
+      audio_fakesink_offerer);
   fail_unless (kms_element_request_srcpad (offerer,
           KMS_ELEMENT_PAD_TYPE_AUDIO));
-  g_object_set_data (G_OBJECT (answerer), AUDIO_SINK, audio_fakesink_answerer);
+  g_object_set_qdata (G_OBJECT (answerer), audio_sink_quark (),
+      audio_fakesink_answerer);
   fail_unless (kms_element_request_srcpad (answerer,
           KMS_ELEMENT_PAD_TYPE_AUDIO));
 
   gst_bin_add_many (GST_BIN (pipeline), video_fakesink_offerer,
       video_fakesink_answerer, NULL);
 
-  g_object_set_data (G_OBJECT (offerer), VIDEO_SINK, video_fakesink_offerer);
+  g_object_set_qdata (G_OBJECT (offerer), video_sink_quark (),
+      video_fakesink_offerer);
   fail_unless (kms_element_request_srcpad (offerer,
           KMS_ELEMENT_PAD_TYPE_VIDEO));
-  g_object_set_data (G_OBJECT (answerer), VIDEO_SINK, video_fakesink_answerer);
+  g_object_set_qdata (G_OBJECT (answerer), video_sink_quark (),
+      video_fakesink_answerer);
   fail_unless (kms_element_request_srcpad (answerer,
           KMS_ELEMENT_PAD_TYPE_VIDEO));
 
@@ -1400,10 +1431,12 @@ test_offerer_audio_video_answerer_video_sendrecv (const gchar * audio_enc_name,
   gst_bin_add_many (GST_BIN (pipeline), video_fakesink_offerer,
       video_fakesink_answerer, NULL);
 
-  g_object_set_data (G_OBJECT (offerer), VIDEO_SINK, video_fakesink_offerer);
+  g_object_set_qdata (G_OBJECT (offerer), video_sink_quark (),
+      video_fakesink_offerer);
   fail_unless (kms_element_request_srcpad (offerer,
           KMS_ELEMENT_PAD_TYPE_VIDEO));
-  g_object_set_data (G_OBJECT (answerer), VIDEO_SINK, video_fakesink_answerer);
+  g_object_set_qdata (G_OBJECT (answerer), video_sink_quark (),
+      video_fakesink_answerer);
   fail_unless (kms_element_request_srcpad (answerer,
           KMS_ELEMENT_PAD_TYPE_VIDEO));
 
@@ -1722,13 +1755,91 @@ static GstStaticCaps vp8_expected_caps = GST_STATIC_CAPS ("video/x-vp8");
 GST_START_TEST (test_vp8_sendonly_recvonly)
 {
   test_video_sendonly ("vp8enc", vp8_expected_caps, "VP8/90000", FALSE, FALSE,
-      FALSE);
+      FALSE, NULL);
   test_video_sendonly ("vp8enc", vp8_expected_caps, "VP8/90000", TRUE, FALSE,
-      FALSE);
+      FALSE, NULL);
   test_video_sendonly ("vp8enc", vp8_expected_caps, "VP8/90000", TRUE, TRUE,
-      FALSE);
+      FALSE, NULL);
   test_video_sendonly ("vp8enc", vp8_expected_caps, "VP8/90000", TRUE, FALSE,
-      TRUE);
+      TRUE, NULL);
+}
+
+GST_END_TEST;
+
+const gchar *rsa_pem = "-----BEGIN PRIVATE KEY-----\r\n"
+    "MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCb+LTrbVIUWgpo\r\n"
+    "2P1xIONodNWBZrjKoSiuDFgmwHvRtbsHu3/wVHBw8aCgMfSAkx5fr/qE3V2u9Ufc\r\n"
+    "OF2Sm2+n6FpSl4n3Y0Pj06GkoZ3G2Q68Pce53jOpud1TJbFT9cPl4zUnz+36fczB\r\n"
+    "US9nNsHHEvkPXu1NbNWsf2/cRB3nSUlENz0lJYMDnNQwmE1IALFvxccY3cCUUsku\r\n"
+    "3hUJiK9SSSHvGOT41xW55IpfjL03HEyU+eBzo+KqCgZ7GPtaYdbMtg6AOIktRIiK\r\n"
+    "NjoMU5Kmv5XY/wdOZFX42pSit3SyBZXIdlJ2/cilRzHdTpX0+FJaQOsE0cmADqUu\r\n"
+    "Z9xQVxYVAgMBAAECggEAeTfDtC0UW4jXCkGKR3/d/XK/9H/XInQ533rsj8GM+aEZ\r\n"
+    "qJrKhge6E61WvunUMpEkTA3Cz7wTcURkAv0zjBuNnZtxhzsLGN9nBguWVxLcQoyz\r\n"
+    "bQ0+ym+tCz3Oiy6CMNSS2XnJ+BUbyVA38A6ensLpu0Q9mPqXx1LMhfHNCA1QiE0w\r\n"
+    "KtmgLaCH55x7fhWJXCkQmsD2Ir8JrS6y3UYQ9fEoFT/qxPyIt77f6cYvsd2zdtWv\r\n"
+    "LvsKG8YeLtbJAgmO0dSDuTKOEIjvjfOio3geVGNXcAa12i7aSsaHElk8OEmTTTDI\r\n"
+    "s8KkqHtuK+/vzj09dvPtT/VFF6NwY+Chjw1aOwGLSQKBgQDKOuPv8zJt3uIiYnoD\r\n"
+    "uSFdReK4daGa/lLrmQ0eEUsRT8hcMV/oZ4nxPh8iNAPVwxtsXGyZ7XTguXrG+Zxq\r\n"
+    "me+9y0A5Nzy+iNMDhQltJP5tnaIVy/GoS2SmPYqz4QcgU//77YZgnKsm3B6vIjJa\r\n"
+    "cs8P0gmiU/1ps/5HwJxZjil33wKBgQDFcSfmotKJLPM2cP/XiYhSqrAy0SrvbvmQ\r\n"
+    "Bbupsr0wnAAfu+/SrbYCUA2x8//Qs8dtZBjTNgQYR+26zWDG2xuHuOwKfG0CYzVk\r\n"
+    "8CHDmlBpM/Jv5H993SXlTj5sp+LA6tplprq0v+9sXINk5R+SP4SaZi+t3zKk0bK2\r\n"
+    "EiymJo0AiwKBgGX5cizx7lD23gLGs44jEU7uSZgIQPheHEQPBk1OHRNarsbGYv1X\r\n"
+    "EHjkgWCG6BQncTGgHWc1FQWood+pyJT8kKac0gLH9sqBRh51PD6cM+vkW/Ivx+i8\r\n"
+    "M8GcMM/pveUwVlmb+XHILonG33YigU+Yqw7oM9F2FsfxalyWJIEILaLzAoGAQWGV\r\n"
+    "OvSUD0TJTS/iKLesYuOO8WT+eMcg8SZU3H8J0zz1dYzAf91yNhXYUyNfhPbjhT/u\r\n"
+    "UJLEjF3VRVSZRYBs/2anE1ncpzu/BKvYInPJSO0gzRi3dzByShq85TI7DnM22w55\r\n"
+    "KT2dxR5ljFWrPLy35oEMLOGKXbXrHguqqWJ+sr0CgYAihBSmBp5KUtR+3ywB4XVF\r\n"
+    "V56MRokU2vrvYO071L5VGfw2aQgj71Mnyqou82RhEpSfO6INsbh++KkcXvgamyK9\r\n"
+    "ecXXDlHpfaQqW9uKDMSrSjIS/stw1vPuaQ5aUYt+zSPkEZtQitDo3mtoYd75gznz\r\n"
+    "oCwhRa+5PS9/8qiujp3WXw==\r\n"
+    "-----END PRIVATE KEY-----\r\n"
+    "-----BEGIN CERTIFICATE-----\r\n"
+    "MIICtzCCAZ+gAwIBAgIBADANBgkqhkiG9w0BAQsFADAfMQswCQYDVQQGEwJTRTEQ\r\n"
+    "MA4GA1UEAwwHS3VyZW50bzAeFw0xNjA2MzAxMDUxMzhaFw0xNzA2MzAxMDUxMzha\r\n"
+    "MB8xCzAJBgNVBAYTAlNFMRAwDgYDVQQDDAdLdXJlbnRvMIIBIjANBgkqhkiG9w0B\r\n"
+    "AQEFAAOCAQ8AMIIBCgKCAQEAm/i0621SFFoKaNj9cSDjaHTVgWa4yqEorgxYJsB7\r\n"
+    "0bW7B7t/8FRwcPGgoDH0gJMeX6/6hN1drvVH3Dhdkptvp+haUpeJ92ND49OhpKGd\r\n"
+    "xtkOvD3Hud4zqbndUyWxU/XD5eM1J8/t+n3MwVEvZzbBxxL5D17tTWzVrH9v3EQd\r\n"
+    "50lJRDc9JSWDA5zUMJhNSACxb8XHGN3AlFLJLt4VCYivUkkh7xjk+NcVueSKX4y9\r\n"
+    "NxxMlPngc6PiqgoGexj7WmHWzLYOgDiJLUSIijY6DFOSpr+V2P8HTmRV+NqUord0\r\n"
+    "sgWVyHZSdv3IpUcx3U6V9PhSWkDrBNHJgA6lLmfcUFcWFQIDAQABMA0GCSqGSIb3\r\n"
+    "DQEBCwUAA4IBAQCNE5tE/ohbaWOTossq2PmYypJjitHUoHfheR9dT5vYm2Izla+z\r\n"
+    "AHZVODp9r/25EG3VjKXshL0rSV3ERC5P0wqGBaKCDRJ4pycfA4Fz93byH4r8/6xL\r\n"
+    "EcRsG6F8vsMht1yTjq1zFCNN+OeWJtQmXCKKFKLY4+lMsnGyJJGXlW1yJe7D9x9Q\r\n"
+    "32DO9KIiRiju+ATHMtrwPwTMgg5Gqd+HmVKhTwcb5RbGwP/xCcK44NLGBdxD8eNi\r\n"
+    "bqedNYytvSmEQGEuwlwtA0fNAetr5x7Qegfl4vTWTKogna1xm7SSYqNeOYJZYauV\r\n"
+    "1E1yY33Cjjz/BFBW6lqcl6ryeqzTwg/GXXGW\r\n" "-----END CERTIFICATE-----";
+
+GST_START_TEST (test_vp8_sendonly_recvonly_rsa)
+{
+  test_video_sendonly ("vp8enc", vp8_expected_caps, "VP8/90000", FALSE, FALSE,
+      FALSE, rsa_pem);
+}
+
+GST_END_TEST;
+
+const gchar *ecdsa_pem = "-----BEGIN EC PARAMETERS-----\r\n"
+    "BggqhkjOPQMBBw==\r\n"
+    "-----END EC PARAMETERS-----\r\n"
+    "-----BEGIN EC PRIVATE KEY-----\r\n"
+    "MHcCAQEEIMIn2bIr1dCmHepxf8r/NINPMR2rj1v43jPxS3a+HTvIoAoGCCqGSM49\r\n"
+    "AwEHoUQDQgAECXHjHX4dtJbSo+9f713PN4rxfcb37XW1G2pDepeI78Fl5oPAKPBI\r\n"
+    "Ws4tJWkrPB1pRX0FKpsZyl79i6w3AS/s+Q==\r\n"
+    "-----END EC PRIVATE KEY-----\r\n"
+    "-----BEGIN CERTIFICATE-----\r\n"
+    "MIIBKzCB0aADAgECAgEAMAoGCCqGSM49BAMCMB8xCzAJBgNVBAYTAlNFMRAwDgYD\r\n"
+    "VQQDDAdLdXJlbnRvMB4XDTE2MDcxODExMDEyM1oXDTE3MDcxODExMDEyM1owHzEL\r\n"
+    "MAkGA1UEBhMCU0UxEDAOBgNVBAMMB0t1cmVudG8wWTATBgcqhkjOPQIBBggqhkjO\r\n"
+    "PQMBBwNCAAQJceMdfh20ltKj71/vXc83ivF9xvftdbUbakN6l4jvwWXmg8Ao8Eha\r\n"
+    "zi0laSs8HWlFfQUqmxnKXv2LrDcBL+z5MAoGCCqGSM49BAMCA0kAMEYCIQC+mC/s\r\n"
+    "6oZzJ6SPfJfJXi5PrOdDDQxhR/aKoxzDbY2SRQIhAL78PAvG56DmpXU2cLTaDlIp\r\n"
+    "zjhIHfiZIzPxTHr129TE\r\n" "-----END CERTIFICATE-----";
+
+GST_START_TEST (test_vp8_sendonly_recvonly_ecdsa)
+{
+  test_video_sendonly ("vp8enc", vp8_expected_caps, "VP8/90000", FALSE, FALSE,
+      FALSE, ecdsa_pem);
 }
 
 GST_END_TEST
@@ -1743,9 +1854,9 @@ GST_END_TEST
 GST_START_TEST (test_vp8_sendrecv_but_sendonly)
 {
   test_video_sendonly ("vp8enc", vp8_expected_caps, "VP8/90000", TRUE, FALSE,
-      FALSE);
+      FALSE, NULL);
   test_video_sendonly ("vp8enc", vp8_expected_caps, "VP8/90000", FALSE, FALSE,
-      FALSE);
+      FALSE, NULL);
 }
 
 GST_END_TEST
@@ -2163,6 +2274,8 @@ webrtcendpoint_test_suite (void)
   tcase_add_test (tc_chain, test_pcmu_sendrecv);
   tcase_add_test (tc_chain, test_vp8_sendrecv_but_sendonly);
   tcase_add_test (tc_chain, test_vp8_sendonly_recvonly);
+  tcase_add_test (tc_chain, test_vp8_sendonly_recvonly_rsa);
+  tcase_add_test (tc_chain, test_vp8_sendonly_recvonly_ecdsa);
   tcase_add_test (tc_chain, test_vp8_sendrecv);
   tcase_add_test (tc_chain, test_offerer_pcmu_vp8_answerer_vp8_sendrecv);
 

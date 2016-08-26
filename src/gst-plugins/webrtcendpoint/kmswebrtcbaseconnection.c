@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2014 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -23,6 +25,13 @@ GST_DEBUG_CATEGORY_STATIC (GST_CAT_DEFAULT);
 
 G_DEFINE_TYPE (KmsWebRtcBaseConnection, kms_webrtc_base_connection,
     G_TYPE_OBJECT);
+
+enum
+{
+  PROP_0,
+  PROP_ICE_AGENT,
+  PROP_STREAM_ID
+};
 
 gboolean
 kms_webrtc_base_connection_configure (KmsWebRtcBaseConnection * self,
@@ -103,12 +112,36 @@ kms_webrtc_base_connection_collect_latency_stats_default (KmsIRtpConnection *
 }
 
 static void
+kms_webrtc_base_connection_get_property (GObject * object,
+    guint prop_id, GValue * value, GParamSpec * pspec)
+{
+  KmsWebRtcBaseConnection *self = KMS_WEBRTC_BASE_CONNECTION (object);
+
+  KMS_WEBRTC_BASE_CONNECTION_LOCK (self);
+
+  switch (prop_id) {
+    case PROP_ICE_AGENT:
+      g_value_set_object (value, self->agent);
+      break;
+    case PROP_STREAM_ID:
+      g_value_set_string (value, self->stream_id);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+
+  KMS_WEBRTC_BASE_CONNECTION_UNLOCK (self);
+}
+
+static void
 kms_webrtc_base_connection_class_init (KmsWebRtcBaseConnectionClass * klass)
 {
   GObjectClass *gobject_class;
 
   gobject_class = G_OBJECT_CLASS (klass);
   gobject_class->finalize = kms_webrtc_base_connection_finalize;
+  gobject_class->get_property = kms_webrtc_base_connection_get_property;
 
   klass->get_certificate_pem =
       kms_webrtc_base_connection_get_certificate_pem_default;
@@ -117,6 +150,16 @@ kms_webrtc_base_connection_class_init (KmsWebRtcBaseConnectionClass * klass)
       kms_webrtc_base_connection_set_latency_callback_default;
   klass->collect_latency_stats =
       kms_webrtc_base_connection_collect_latency_stats_default;
+
+  g_object_class_install_property (gobject_class, PROP_ICE_AGENT,
+      g_param_spec_object ("ice-agent", "Ice agent",
+          "The Ice agent.", KMS_TYPE_ICE_BASE_AGENT,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_STREAM_ID,
+      g_param_spec_string ("stream-id", "Stream identifier",
+          "The stream identifier.", NULL,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   GST_DEBUG_CATEGORY_INIT (GST_CAT_DEFAULT, GST_DEFAULT_NAME, 0,
       GST_DEFAULT_NAME);

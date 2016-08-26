@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2014 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -25,9 +27,14 @@
 
 #define PLUGIN_NAME "httppostendpoint"
 
-#define APPSRC_DATA "appsrc_data"
-#define APPSINK_DATA "appsink_data"
-#define BASE_TIME_DATA "base_time_data"
+#define APPSRC_DATA "appsrc-data"
+G_DEFINE_QUARK (APPSRC_DATA, appsrc_data);
+
+#define APPSINK_DATA "appsink-data"
+G_DEFINE_QUARK (APPSINK_DATA, appsink_data);
+
+#define BASE_TIME_DATA "base-time-data"
+G_DEFINE_QUARK (BASE_TIME_DATA, base_time_data);
 
 #define POST_PIPELINE "post-pipeline"
 
@@ -114,7 +121,8 @@ new_sample_post_handler (GstElement * appsink, gpointer user_data)
   BASE_TIME_LOCK (GST_OBJECT_PARENT (appsrc));
 
   base_time =
-      g_object_get_data (G_OBJECT (GST_OBJECT_PARENT (appsrc)), BASE_TIME_DATA);
+      g_object_get_qdata (G_OBJECT (GST_OBJECT_PARENT (appsrc)),
+      base_time_data_quark ());
 
   if (base_time == NULL) {
     GstClock *clock;
@@ -122,8 +130,8 @@ new_sample_post_handler (GstElement * appsink, gpointer user_data)
     clock = gst_element_get_clock (appsrc);
     base_time = g_slice_new0 (GstClockTime);
 
-    g_object_set_data_full (G_OBJECT (GST_OBJECT_PARENT (appsrc)),
-        BASE_TIME_DATA, base_time, release_gst_clock);
+    g_object_set_qdata_full (G_OBJECT (GST_OBJECT_PARENT (appsrc)),
+        base_time_data_quark (), base_time, release_gst_clock);
     *base_time =
         gst_clock_get_time (clock) - gst_element_get_base_time (appsrc);
     g_object_unref (clock);
@@ -178,9 +186,8 @@ set_appsrc_caps (GstPad * pad, GstPadProbeInfo * info, gpointer httpep)
 
   GST_TRACE ("caps are %" GST_PTR_FORMAT, caps);
 
-  data = g_object_get_data (G_OBJECT (pad), APPSRC_DATA);
+  data = g_object_get_qdata (G_OBJECT (pad), appsrc_data_quark ());
   if (data != NULL) {
-    g_object_set_data (G_OBJECT (data), "caps", caps);
     goto end;
   }
 
@@ -218,7 +225,7 @@ set_appsrc_caps (GstPad * pad, GstPadProbeInfo * info, gpointer httpep)
       appsrc);
   g_object_unref (appsink);
 
-  g_object_set_data (G_OBJECT (pad), APPSRC_DATA, appsrc);
+  g_object_set_qdata (G_OBJECT (pad), appsrc_data_quark (), appsrc);
   gst_element_sync_state_with_parent (appsrc);
 
 end:
@@ -258,7 +265,7 @@ post_decodebin_pad_added_handler (GstElement * decodebin, GstPad * pad,
 
   g_object_unref (sinkpad);
 
-  g_object_set_data (G_OBJECT (pad), APPSINK_DATA, appsink);
+  g_object_set_qdata (G_OBJECT (pad), appsink_data_quark (), appsink);
 
   gst_element_sync_state_with_parent (appsink);
 }
@@ -275,7 +282,7 @@ post_decodebin_pad_removed_handler (GstElement * decodebin, GstPad * pad,
 
   GST_DEBUG ("pad %" GST_PTR_FORMAT " removed", pad);
 
-  appsink = g_object_steal_data (G_OBJECT (pad), APPSINK_DATA);
+  appsink = g_object_steal_qdata (G_OBJECT (pad), appsink_data_quark ());
 
   if (appsink == NULL) {
     GST_ERROR ("No appsink was found associated with %" GST_PTR_FORMAT, pad);
@@ -283,7 +290,7 @@ post_decodebin_pad_removed_handler (GstElement * decodebin, GstPad * pad,
   }
 
   sinkpad = gst_element_get_static_pad (appsink, "sink");
-  appsrc = g_object_get_data (G_OBJECT (sinkpad), APPSRC_DATA);
+  appsrc = g_object_get_qdata (G_OBJECT (sinkpad), appsrc_data_quark ());
   g_object_unref (sinkpad);
 
   if (!gst_element_set_locked_state (appsink, TRUE))

@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2013 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 #ifdef HAVE_CONFIG_H
@@ -40,12 +42,15 @@
 
 #define PLUGIN_NAME "recorderendpoint"
 
-#define BASE_TIME_DATA "base_time_data"
 #define RECORDER_DEFAULT_SUFFIX "_default"
 
 #define DEFAULT_RECORDING_PROFILE KMS_RECORDING_PROFILE_NONE
 
-#define KMS_PAD_IDENTIFIER_KEY "kms-pad-identifier-key"
+#define BASE_TIME_KEY "base-time-key"
+G_DEFINE_QUARK (KMS_PAD_ID_KEY, base_time_key);
+
+#define KMS_PAD_ID_KEY "kms-pad-id-key"
+G_DEFINE_QUARK (KMS_PAD_ID_KEY, kms_pad_id_key);
 
 GST_DEBUG_CATEGORY_STATIC (kms_recorder_endpoint_debug_category);
 #define GST_CAT_DEFAULT kms_recorder_endpoint_debug_category
@@ -64,6 +69,14 @@ GST_DEBUG_CATEGORY_STATIC (kms_recorder_endpoint_debug_category);
 
 #define BASE_TIME_UNLOCK(obj) (                                         \
   g_mutex_unlock (&KMS_RECORDER_ENDPOINT(obj)->priv->base_time_lock)    \
+)
+
+#define SRCS_LOCK(obj) (                                           \
+  g_mutex_lock (&KMS_RECORDER_ENDPOINT(obj)->priv->srcs_mutex)     \
+)
+
+#define SRCS_UNLOCK(obj) (                                         \
+  g_mutex_unlock (&KMS_RECORDER_ENDPOINT(obj)->priv->srcs_mutex)   \
 )
 
 static void link_sinkpad_cb (GstPad * pad, GstPad * peer, gpointer user_data);
@@ -109,6 +122,7 @@ struct _KmsRecorderEndpointPrivate
 
   GSList *sink_probes;
   GHashTable *srcs;
+  GMutex srcs_mutex;
 
   KmsRecorderStats stats;
 
@@ -297,7 +311,7 @@ recv_sample (GstAppSink * appsink, gpointer user_data)
 
   BASE_TIME_LOCK (self);
 
-  base_time = g_object_get_data (G_OBJECT (self), BASE_TIME_DATA);
+  base_time = g_object_get_qdata (G_OBJECT (self), base_time_key_quark ());
 
   if (base_time == NULL) {
     base_time = g_slice_new0 (BaseTimeType);
@@ -305,7 +319,7 @@ recv_sample (GstAppSink * appsink, gpointer user_data)
     base_time->dts = buffer->dts;
     GST_DEBUG_OBJECT (appsrc, "Setting pts base time to: %" G_GUINT64_FORMAT,
         base_time->pts);
-    g_object_set_data_full (G_OBJECT (self), BASE_TIME_DATA, base_time,
+    g_object_set_qdata_full (G_OBJECT (self), base_time_key_quark (), base_time,
         release_base_time_type);
   }
 
@@ -402,21 +416,25 @@ send_eos_cb (gchar * id, GstElement * appsrc, gpointer user_data)
   send_eos (appsrc);
 }
 
+/*
+ * It should be always called with the element lock hold.
+ */
 static void
 kms_recorder_endpoint_send_eos_to_appsrcs (KmsRecorderEndpoint * self)
 {
+  KMS_ELEMENT_UNLOCK (self);
+  SRCS_LOCK (self);
   if (g_hash_table_size (self->priv->srcs) == 0) {
-    KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
     kms_base_media_muxer_set_state (self->priv->mux, GST_STATE_NULL);
-    KMS_ELEMENT_LOCK (KMS_ELEMENT (self));
-    return;
+    goto end;
   }
 
-  KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
   kms_base_media_muxer_set_state (self->priv->mux, GST_STATE_PLAYING);
-  KMS_ELEMENT_LOCK (KMS_ELEMENT (self));
-
   g_hash_table_foreach (self->priv->srcs, (GHFunc) send_eos_cb, NULL);
+
+end:
+  SRCS_UNLOCK (self);
+  KMS_ELEMENT_LOCK (self);
 }
 
 static void
@@ -446,8 +464,6 @@ kms_recorder_endpoint_dispose (GObject * object)
 
   KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
 
-  g_mutex_clear (&self->priv->base_time_lock);
-
   /* clean up as possible.  may be called multiple times */
 
   G_OBJECT_CLASS (kms_recorder_endpoint_parent_class)->dispose (object);
@@ -473,10 +489,13 @@ kms_recorder_endpoint_finalize (GObject * object)
   g_slist_free_full (self->priv->sink_probes,
       (GDestroyNotify) kms_stats_probe_destroy);
   g_hash_table_unref (self->priv->srcs);
+  g_mutex_clear (&self->priv->srcs_mutex);
 
   g_hash_table_unref (self->priv->sink_pad_data);
   g_slist_free_full (self->priv->pending_pads, g_free);
   g_hash_table_unref (self->priv->stats.avg_e2e);
+
+  g_mutex_clear (&self->priv->base_time_lock);
 
   GST_DEBUG_OBJECT (self, "finalized");
 
@@ -608,6 +627,10 @@ kms_recorder_endpoint_stopped (KmsUriEndpoint * obj)
 {
   KmsRecorderEndpoint *self = KMS_RECORDER_ENDPOINT (obj);
 
+  if (self->priv->stopping) {
+    return;
+  }
+
   kms_recorder_endpoint_change_state (self, KMS_URI_ENDPOINT_STATE_STOP);
 
   if (kms_base_media_muxer_get_state (self->priv->mux) >= GST_STATE_PAUSED) {
@@ -620,7 +643,7 @@ kms_recorder_endpoint_stopped (KmsUriEndpoint * obj)
   // Reset base time data
   BASE_TIME_LOCK (self);
 
-  g_object_set_data_full (G_OBJECT (self), BASE_TIME_DATA, NULL, NULL);
+  g_object_set_qdata_full (G_OBJECT (self), base_time_key_quark (), NULL, NULL);
 
   self->priv->paused_time = G_GUINT64_CONSTANT (0);
   self->priv->paused_start = GST_CLOCK_TIME_NONE;
@@ -738,21 +761,13 @@ set_appsink_caps (GstElement * appsink, const GstCaps * caps,
     goto end;
   }
 
-  if (!gst_structure_has_field (str, "framerate")) {
-    GST_DEBUG_OBJECT (appsink, "No framerate in caps %" GST_PTR_FORMAT,
-        sinkcaps);
-  } else {
-    GST_DEBUG_OBJECT (appsink, "Removing framerate from caps %" GST_PTR_FORMAT,
-        sinkcaps);
-    gst_structure_remove_field (str, "framerate");
-  }
-
   switch (profile) {
     case KMS_RECORDING_PROFILE_WEBM:
     case KMS_RECORDING_PROFILE_WEBM_VIDEO_ONLY:
       /* Allow renegotiation of width and height because webmmux supports it */
       gst_structure_remove_field (str, "width");
       gst_structure_remove_field (str, "height");
+      gst_structure_remove_field (str, "framerate");
       break;
     default:
       /* No to allow height and width renegotiation */
@@ -825,7 +840,7 @@ link_sinkpad_cb (GstPad * pad, GstPad * peer, gpointer user_data)
     return;
   }
 
-  key = g_object_get_data (G_OBJECT (target), KMS_PAD_IDENTIFIER_KEY);
+  key = g_object_get_qdata (G_OBJECT (target), kms_pad_id_key_quark ());
 
   if (key == NULL) {
     GST_ERROR_OBJECT (pad, "No identifier assigned");
@@ -874,7 +889,9 @@ link_sinkpad_cb (GstPad * pad, GstPad * peer, gpointer user_data)
 
   gst_pad_set_element_private (pad, g_object_ref (appsrc));
 
+  SRCS_LOCK (self);
   g_hash_table_insert (self->priv->srcs, id, g_object_ref (appsrc));
+  SRCS_UNLOCK (self);
 
   if (sinkdata->sink_probe != 0UL) {
     gst_pad_remove_probe (target, sinkdata->sink_probe);
@@ -898,6 +915,16 @@ end:
   KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
 
   g_clear_object (&target);
+}
+
+static void
+kms_recorder_release_pending_pad (gchar * id, KmsRecorderEndpoint * self)
+{
+  if (kms_base_media_muxer_remove_src (self->priv->mux, id)) {
+    SRCS_LOCK (self);
+    g_hash_table_remove (self->priv->srcs, id);
+    SRCS_UNLOCK (self);
+  }
 }
 
 static void
@@ -970,7 +997,7 @@ kms_recorder_endpoint_add_appsink (KmsRecorderEndpoint * self,
   data = sink_pad_data_new (type, description, name, requested);
   data->sink_target = sinkpad;
   g_hash_table_insert (self->priv->sink_pad_data, g_strdup (name), data);
-  g_object_set_data_full (G_OBJECT (sinkpad), KMS_PAD_IDENTIFIER_KEY,
+  g_object_set_qdata_full (G_OBJECT (sinkpad), kms_pad_id_key_quark (),
       g_strdup (name), g_free);
 
   g_object_unref (sinkpad);
@@ -1392,20 +1419,20 @@ kms_recorder_endpoint_query_accept_caps (KmsElement * element, GstPad * pad,
 
     id = gst_pad_get_name (pad);
 
-    KMS_ELEMENT_LOCK (KMS_ELEMENT (self));
+    SRCS_LOCK (self);
 
     appsrc = g_hash_table_lookup (self->priv->srcs, id);
     g_free (id);
 
     if (appsrc == NULL) {
-      KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
+      SRCS_UNLOCK (self);
       GST_DEBUG_OBJECT (self, "No appsrc attached to pad %" GST_PTR_FORMAT,
           pad);
       goto end;
     }
     srcpad = gst_element_get_static_pad (appsrc, "src");
 
-    KMS_ELEMENT_UNLOCK (KMS_ELEMENT (self));
+    SRCS_UNLOCK (self);
 
     ret = gst_pad_peer_query_accept_caps (srcpad, accept);
     gst_object_unref (srcpad);
@@ -1784,11 +1811,12 @@ kms_recorder_endpoint_init (KmsRecorderEndpoint * self)
   self->priv = KMS_RECORDER_ENDPOINT_GET_PRIVATE (self);
 
   g_mutex_init (&self->priv->base_time_lock);
+  g_mutex_init (&self->priv->srcs_mutex);
 
   self->priv->srcs = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
       g_object_unref);
 
-  self->priv->profile = KMS_RECORDING_PROFILE_NONE;
+  self->priv->profile = DEFAULT_RECORDING_PROFILE;
 
   self->priv->paused_time = G_GUINT64_CONSTANT (0);
   self->priv->paused_start = GST_CLOCK_TIME_NONE;
@@ -1819,5 +1847,5 @@ GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     kmsrecorderendpoint,
     "Kurento recorder endpoint",
-    kms_recorder_endpoint_plugin_init, VERSION, "LGPL",
+    kms_recorder_endpoint_plugin_init, VERSION, GST_LICENSE_UNKNOWN,
     "Kurento Elements", "http://kurento.com/")

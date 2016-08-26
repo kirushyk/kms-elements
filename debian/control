@@ -5,16 +5,17 @@ Maintainer: Kurento Maintenance Team <kurento@googlegroups.com>
 Build-Depends: debhelper (>= 8.0.0),
  cmake,
  pkg-config,
- kms-core-6.0-dev (>= 6.4.0),
+ kms-core-6.0-dev (>= 6.5.0),
  libboost-filesystem-dev,
  libboost-test-dev,
  libsoup2.4-dev,
- libnice-dev (>= 0.1.13),
- gstreamer1.5-nice,
+ libnice-dev (>= 0.1.13.1~0),
+ gstreamer1.5-nice (>= 0.1.13.1~0),
  uuid-dev,
  valgrind,
  openwebrtc-gst-plugins-dev,
- ffmpeg
+ ffmpeg,
+ libssl-dev
 Standards-Version: 3.9.4
 Homepage: http://kurento.org
 Vcs-Git: git://github.com/Kurento/kms-elements.git
@@ -25,9 +26,10 @@ Architecture: any
 Depends:
   ${shlibs:Depends},
   ${misc:Depends},
-  gstreamer1.5-nice (>= 0.1.13),
+  gstreamer1.5-nice (>= 0.1.13.1~0),
   openwebrtc-gst-plugins,
-  kms-core-6.0 (>= 6.3.1)
+  libssl1.0.0 (>= 1.0.2d),
+  kms-core-6.0 (>= 6.5.0)
 Breaks:
   kms-elements
 Description: Kurento elements module
@@ -36,7 +38,7 @@ Description: Kurento elements module
 Package: kms-elements-6.0-dev
 Architecture: any
 Depends: kms-elements-6.0 (= ${binary:Version}),
-  libnice-dev (>= 0.1.7),
+  libnice-dev (>= 0.1.13.1~0),
   kms-core-6.0-dev
 Breaks:
   kms-elements-dev

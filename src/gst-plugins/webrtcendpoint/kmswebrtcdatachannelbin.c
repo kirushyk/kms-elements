@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2015 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 #ifdef HAVE_CONFIG_H
@@ -175,8 +177,6 @@ static const gchar *const str_state[] = {
 static const gchar *
 state2str (KmsWebRtcDataChannelState state)
 {
-  g_return_val_if_fail (state >= 0 && state < G_N_ELEMENTS (str_state), NULL);
-
   return str_state[state];
 }
 
@@ -991,8 +991,8 @@ kms_webrtc_data_channel_bin_new (guint id, gboolean ordered,
           max_retransmits, "label", label, "protocol", protocol, NULL));
 
   caps = kms_webrtc_data_channel_bin_create_caps (obj);
-
   g_object_set (obj->priv->appsrc, "caps", caps, NULL);
+  gst_caps_unref (caps);
 
   return obj;
 }
@@ -1176,7 +1176,8 @@ kms_webrtc_data_channel_bin_push_buffer (KmsWebRtcDataChannelBin * self,
   } else if (self->priv->max_packet_life_time != -1) {
     pr = GST_SCTP_SEND_META_PARTIAL_RELIABILITY_TTL;
     pr_param = self->priv->max_packet_life_time;
-  } else if (self->priv->max_packet_retransmits != -1) {
+  } else {                      /* if (self->priv->max_packet_retransmits != -1) */
+
     pr = GST_SCTP_SEND_META_PARTIAL_RELIABILITY_RTX;
     pr_param = self->priv->max_packet_retransmits;
   }

@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2016 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -155,12 +157,61 @@ eos_received ()
   g_cond_clear (&cond);
 }
 
+static void
+eos_received_with_no_accept_eos_sink ()
+{
+  std::shared_ptr <PlayerEndpointImpl> player = createPlayerEndpoint ();
+  std::shared_ptr <MediaElementImpl> sink = createTestSink();
+  GCond cond;
+  GMutex mutex;
+  bool eos = false;
+  gint64 end_time;
+
+  g_mutex_init (&mutex);
+  g_cond_init (&cond);
+
+  g_object_set (sink->getGstreamerElement(), "accept-eos", FALSE, NULL);
+
+  player->signalEndOfStream.connect ([&] (EndOfStream event) {
+    std::cout << "EOS received" << std::endl;
+    g_mutex_lock (&mutex);
+    eos = true;
+    g_cond_signal (&cond);
+    g_mutex_unlock (&mutex);
+  });
+
+  std::dynamic_pointer_cast <MediaElementImpl> (player)->connect (sink);
+
+  player->play ();
+  end_time = g_get_monotonic_time () + TIME;
+
+  g_mutex_lock (&mutex);
+
+  while (!eos) {
+    if (!g_cond_wait_until (&cond, &mutex, end_time) ) {
+      g_mutex_unlock (&mutex);
+      std::cout << "EOS NOT received" << std::endl;
+      BOOST_CHECK (false);
+      return;
+    }
+  }
+
+  g_mutex_unlock (&mutex);
+
+  releaseTestSink (sink);
+  releasePlayerEndpoint (player);
+  g_mutex_clear (&mutex);
+  g_cond_clear (&cond);
+}
+
 test_suite *
 init_unit_test_suite ( int , char *[] )
 {
   test_suite *test = BOOST_TEST_SUITE ( "PlayerEndpoint" );
 
   test->add (BOOST_TEST_CASE ( &eos_received ), 0, /* timeout */ 20);
+  test->add (BOOST_TEST_CASE ( &eos_received_with_no_accept_eos_sink), 0,
+             /* timeout */ 20);
 
   return test;
 }

@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2015 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -48,11 +50,35 @@ struct _KmsIceCandidateClass
   GObjectClass parent_class;
 };
 
+typedef enum
+{
+  KMS_ICE_PROTOCOL_UDP,
+  KMS_ICE_PROTOCOL_TCP
+} KmsIceProtocol;
+
+typedef enum
+{
+  KMS_ICE_CANDIDATE_TYPE_HOST,
+  KMS_ICE_CANDIDATE_TYPE_SRFLX,
+  KMS_ICE_CANDIDATE_TYPE_PRFLX,
+  KMS_ICE_CANDIDATE_TYPE_RELAY
+} KmsIceCandidateType;
+
+typedef enum
+{
+  KMS_ICE_TCP_CANDIDATE_TYPE_NONE,
+  KMS_ICE_TCP_CANDIDATE_TYPE_ACTIVE,
+  KMS_ICE_TCP_CANDIDATE_TYPE_PASSIVE,
+  KMS_ICE_TCP_CANDIDATE_TYPE_SO
+} KmsIceTcpCandidateType;
+
+
 GType kms_ice_candidate_get_type (void);
 
 KmsIceCandidate *kms_ice_candidate_new (const gchar * candidate,
     const gchar * sdp_mid, guint8 sdp_m_line_index, const gchar *stream_id);
 
+/* TODO: Use GObject getters instead */
 const gchar * kms_ice_candidate_get_candidate (KmsIceCandidate * self);
 const gchar * kms_ice_candidate_get_sdp_mid (KmsIceCandidate * self);
 gchar * kms_ice_candidate_get_address (KmsIceCandidate * self);
@@ -61,6 +87,13 @@ int kms_ice_candidate_get_ip_version (KmsIceCandidate * self);
 guint8 kms_ice_candidate_get_sdp_m_line_index (KmsIceCandidate * self);
 const gchar * kms_ice_candidate_get_stream_id (KmsIceCandidate * self);
 gchar * kms_ice_candidate_get_sdp_line (KmsIceCandidate * self);
+gchar * kms_ice_candidate_get_foundation (KmsIceCandidate * self);
+guint kms_ice_candidate_get_priority (KmsIceCandidate * self);
+KmsIceProtocol kms_ice_candidate_get_protocol (KmsIceCandidate * self);
+KmsIceCandidateType kms_ice_candidate_get_candidate_type (KmsIceCandidate * self);
+KmsIceTcpCandidateType kms_ice_candidate_get_candidate_tcp_type (KmsIceCandidate * self);
+gchar * kms_ice_candidate_get_related_address (KmsIceCandidate * self);
+gint kms_ice_candidate_get_related_port (KmsIceCandidate * self);
 
 G_END_DECLS
 #endif /* __KMS_ICE_ICE_CANDIDATE_H__ */

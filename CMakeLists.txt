@@ -46,6 +46,7 @@ generic_find (LIBNAME gio-2.0 VERSION ${GLIB_REQUIRED} REQUIRED)
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   generic_find (LIBNAME uuid REQUIRED)
 endif ()
+generic_find (LIBNAME openssl REQUIRED)
 
 set (VERSION ${PROJECT_VERSION})
 set (PACKAGE ${PROJECT_NAME})
@@ -64,6 +65,13 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O2 -DHAVE_CONFIG_H -Werror -Wall -Werror=declaration-after-statement -Werror=strict-aliasing")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -DHAVE_CONFIG_H -Wall -Werror -std=c++11")
+
+include(CheckCXXCompilerFlag)
+
+CHECK_CXX_COMPILER_FLAG("-Wno-error=date-time" COMPILER_SUPPORTS_DATETIME_ERROR)
+if (COMPILER_SUPPORTS_DATETIME_ERROR)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=date-time")
+endif ()
 
 enable_testing()
 

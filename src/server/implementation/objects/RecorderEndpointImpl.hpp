@@ -1,3 +1,19 @@
+/*
+ * (C) Copyright 2016 Kurento (http://kurento.org/)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 #ifndef __RECORDER_ENDPOINT_IMPL_HPP__
 #define __RECORDER_ENDPOINT_IMPL_HPP__
 
@@ -28,12 +44,17 @@ public:
 
   virtual ~RecorderEndpointImpl ();
 
-  void record ();
-  virtual void stopAndWait ();
+  void record () override;
+  virtual void stopAndWait () override;
 
   /* Next methods are automatically implemented by code generator */
+  using UriEndpointImpl::connect;
   virtual bool connect (const std::string &eventType,
-                        std::shared_ptr<EventHandler> handler);
+                        std::shared_ptr<EventHandler> handler) override;
+
+  sigc::signal<void, Recording> signalRecording;
+  sigc::signal<void, Paused> signalPaused;
+  sigc::signal<void, Stopped> signalStopped;
 
   sigc::signal<void, Recording> signalRecording;
   sigc::signal<void, Paused> signalPaused;
@@ -41,17 +62,18 @@ public:
 
   virtual void invoke (std::shared_ptr<MediaObjectImpl> obj,
                        const std::string &methodName, const Json::Value &params,
-                       Json::Value &response);
+                       Json::Value &response) override;
 
-  virtual void Serialize (JsonSerializer &serializer);
+  virtual void Serialize (JsonSerializer &serializer) override;
 
 protected:
   virtual void fillStatsReport (std::map <std::string, std::shared_ptr<Stats>>
-                                &report, const GstStructure *stats, double timestamp);
+                                &report, const GstStructure *stats,
+                                double timestamp) override;
 
-  virtual void postConstructor ();
+  virtual void postConstructor () override;
 
-  virtual void release ();
+  virtual void release () override;
 private:
   static bool support_ksr;
   gulong handlerOnStateChanged = 0;

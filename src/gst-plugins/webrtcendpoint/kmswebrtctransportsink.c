@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2015 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -46,7 +48,7 @@ kms_webrtc_transport_sink_connect_elements (KmsWebrtcTransportSink * self)
 
   funnel = gst_bin_get_by_name (GST_BIN (self->dtlssrtpenc), FUNNEL_NAME);
   if (funnel != NULL) {
-    g_object_set (funnel, "forward-sticky-events", FALSE, NULL);
+    g_object_set (funnel, "forward-sticky-events-mode", 0 /* never */ , NULL);
     g_object_unref (funnel);
   } else {
     GST_WARNING ("Cannot get funnel with name %s", FUNNEL_NAME);
@@ -55,7 +57,7 @@ kms_webrtc_transport_sink_connect_elements (KmsWebrtcTransportSink * self)
   srtpenc = gst_bin_get_by_name (GST_BIN (self->dtlssrtpenc), SRTPENC_NAME);
   if (srtpenc != NULL) {
     g_object_set (srtpenc, "allow-repeat-tx", TRUE, "replay-window-size",
-        SRTP_REPLAY_WINDOW_SIZE, NULL);
+        RTP_RTX_SIZE, NULL);
     g_object_unref (srtpenc);
   } else {
     GST_WARNING ("Cannot get srtpenc with name %s", SRTPENC_NAME);

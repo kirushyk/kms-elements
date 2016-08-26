@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2013 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 #ifdef HAVE_CONFIG_H
@@ -296,13 +298,13 @@ cb_latency (GstPad * pad, GstPadProbeInfo * info, gpointer data)
     return GST_PAD_PROBE_OK;
   }
 
-  GST_LOG_OBJECT (pad, "Modifing latency query. New latency %" G_GUINT64_FORMAT,
+  GST_LOG_OBJECT (pad, "Modifing latency query. New latency %ld",
       LATENCY * GST_MSECOND);
 
   gst_query_set_latency (GST_PAD_PROBE_INFO_QUERY (info),
-      TRUE, LATENCY * GST_MSECOND, LATENCY * GST_MSECOND);
+      TRUE, 0, LATENCY * GST_MSECOND);
 
-  return GST_PAD_PROBE_OK;
+  return GST_PAD_PROBE_HANDLED;
 }
 
 static void
@@ -641,7 +643,8 @@ kms_composite_mixer_handle_port (KmsBaseHub * mixer,
   if (self->priv->videomixer == NULL) {
     self->priv->videomixer = gst_element_factory_make ("compositor", NULL);
     g_object_set (G_OBJECT (self->priv->videomixer), "background",
-        1 /*black */ , "start-time-selection", 1 /*first */ , NULL);
+        1 /*black */ , "start-time-selection", 1 /*first */ ,
+        "latency", LATENCY * GST_MSECOND, NULL);
     self->priv->mixer_video_agnostic =
         gst_element_factory_make ("agnosticbin", NULL);
 
@@ -686,6 +689,9 @@ kms_composite_mixer_handle_port (KmsBaseHub * mixer,
       /*link capsfilter -> videomixer */
       pad = gst_element_request_pad (self->priv->videomixer, sink_pad_template,
           NULL, NULL);
+
+      gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_QUERY_UPSTREAM,
+          (GstPadProbeCallback) cb_latency, NULL, NULL);
 
       gst_element_link_pads (capsfilter, NULL,
           self->priv->videomixer, GST_OBJECT_NAME (pad));

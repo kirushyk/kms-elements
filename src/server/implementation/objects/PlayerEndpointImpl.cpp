@@ -1,3 +1,19 @@
+/*
+ * (C) Copyright 2016 Kurento (http://kurento.org/)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 #include <gst/gst.h>
 #include "MediaPipeline.hpp"
 #include "VideoInfo.hpp"
@@ -80,12 +96,13 @@ void PlayerEndpointImpl::postConstructor()
 PlayerEndpointImpl::PlayerEndpointImpl (const boost::property_tree::ptree &conf,
                                         std::shared_ptr<MediaPipeline>
                                         mediaPipeline, const std::string &uri,
-                                        bool useEncodedMedia) : UriEndpointImpl (conf,
+                                        bool useEncodedMedia, int networkCache) : UriEndpointImpl (conf,
                                               std::dynamic_pointer_cast<MediaObjectImpl> (mediaPipeline), FACTORY_NAME, uri)
 {
   GstElement *element = getGstreamerElement();
 
-  g_object_set (G_OBJECT (element), "use-encoded-media", useEncodedMedia, NULL);
+  g_object_set (G_OBJECT (element), "use-encoded-media", useEncodedMedia,
+                "network-cache", networkCache, NULL);
 }
 
 PlayerEndpointImpl::~PlayerEndpointImpl()
@@ -159,9 +176,10 @@ MediaObjectImpl *
 PlayerEndpointImplFactory::createObject (const boost::property_tree::ptree
     &conf,
     std::shared_ptr<MediaPipeline> mediaPipeline, const std::string &uri,
-    bool useEncodedMedia) const
+    bool useEncodedMedia, int networkCache) const
 {
-  return new PlayerEndpointImpl (conf, mediaPipeline, uri, useEncodedMedia);
+  return new PlayerEndpointImpl (conf, mediaPipeline, uri, useEncodedMedia,
+                                 networkCache);
 }
 
 PlayerEndpointImpl::StaticConstructor PlayerEndpointImpl::staticConstructor;

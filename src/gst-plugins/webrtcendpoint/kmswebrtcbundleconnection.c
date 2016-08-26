@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2015 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -36,7 +38,8 @@ enum
   PROP_CONNECTED,
   PROP_IS_CLIENT,
   PROP_MAX_PORT,
-  PROP_MIN_PORT
+  PROP_MIN_PORT,
+  PROP_TRANSPORT
 };
 
 struct _KmsWebRtcBundleConnectionPrivate
@@ -248,6 +251,9 @@ kms_webrtc_bundle_connection_get_property (GObject * object,
     case PROP_MAX_PORT:
       g_value_set_uint (value, self->parent.max_port);
       break;
+    case PROP_TRANSPORT:
+      g_value_set_object (value, self->priv->tr);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -283,7 +289,7 @@ kms_webrtc_bundle_connection_new (KmsIceBaseAgent * agent,
   }
 
   priv->tr =
-      kms_webrtc_transport_create (agent, base_conn->stream_id,
+      kms_webrtc_transport_new (agent, base_conn->stream_id,
       NICE_COMPONENT_TYPE_RTP, pem_cerficate);
 
   if (priv->tr == NULL) {
@@ -306,7 +312,7 @@ kms_webrtc_bundle_connection_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (self, "finalize");
 
-  kms_webrtc_transport_destroy (priv->tr);
+  g_clear_object (&priv->tr);
 
   /* chain up */
   G_OBJECT_CLASS (kms_webrtc_bundle_connection_parent_class)->finalize (object);
@@ -345,6 +351,11 @@ kms_webrtc_bundle_connection_class_init (KmsWebRtcBundleConnectionClass * klass)
   g_object_class_override_property (gobject_class, PROP_MAX_PORT, "max-port");
   g_object_class_override_property (gobject_class, PROP_MIN_PORT, "min-port");
 
+  g_object_class_install_property (gobject_class, PROP_TRANSPORT,
+      g_param_spec_object ("transport", "Transport",
+          "The transport used to send and receive RTP and RTCP packets.",
+          KMS_TYPE_WEBRTC_TRANSPORT,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 }
 
 static void

@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2015 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -58,9 +60,6 @@ G_DEFINE_TYPE (KmsWebrtcSession, kms_webrtc_session, KMS_TYPE_BASE_RTP_SESSION);
 
 #define MAX_DATA_CHANNELS 1
 
-#define BEGIN_CERTIFICATE "-----BEGIN CERTIFICATE-----"
-#define END_CERTIFICATE "-----END CERTIFICATE-----"
-
 enum
 {
   SIGNAL_ON_ICE_CANDIDATE,
@@ -74,7 +73,6 @@ enum
   SIGNAL_DATA_CHANNEL_CLOSED,
   ACTION_CREATE_DATA_CHANNEL,
   ACTION_DESTROY_DATA_CHANNEL,
-  SIGNAL_DATA_PADS_REMOVE,
   SIGNAL_NEW_SELECTED_PAIR_FULL,
   LAST_SIGNAL
 };
@@ -312,7 +310,7 @@ kms_webrtc_session_remote_sdp_add_ice_candidate (KmsWebrtcSession *
   mconf = g_slist_nth_data (medias, index);
   if (mconf == NULL) {
     GST_WARNING_OBJECT (self,
-        "Media not found in remote SDP for index %" G_GUINT16_FORMAT, index);
+        "Media not found in remote SDP for index %u", index);
   } else {
     GstSDPMedia *media = kms_sdp_media_config_get_sdp_media (mconf);
 
@@ -342,11 +340,10 @@ kms_webrtc_session_set_remote_ice_candidate (KmsWebrtcSession * self,
   mconf = g_slist_nth_data (medias, index);
   if (mconf == NULL) {
     GST_WARNING_OBJECT (self,
-        "Media not found in local SDP for index %" G_GUINT16_FORMAT, index);
+        "Media not found in local SDP for index %u", index);
     return FALSE;
   } else if (kms_sdp_media_config_is_inactive (mconf)) {
-    GST_DEBUG_OBJECT (self, "Media inactive for index %" G_GUINT16_FORMAT,
-        index);
+    GST_DEBUG_OBJECT (self, "Media inactive for index %u", index);
     return TRUE;
   } else {
     gchar *stream_id;
@@ -778,60 +775,6 @@ kms_webrtc_session_set_ice_candidates (KmsWebrtcSession * self,
 }
 
 static gchar *
-generate_fingerprint_from_pem (const gchar * pem)
-{
-  guint i;
-  gchar *line;
-  guchar *der, *tmp;
-  gchar **lines;
-  gint state = 0;
-  guint save = 0;
-  gsize der_length = 0;
-  GChecksum *checksum;
-  guint8 *digest;
-  gsize digest_length;
-  GString *fingerprint;
-  gchar *ret;
-
-  der = tmp = g_new0 (guchar, (strlen (pem) / 4) * 3 + 3);
-  lines = g_strsplit (pem, "\n", 0);
-
-  for (i = 0, line = lines[i]; line; line = lines[++i]) {
-    if (line[0] && g_str_has_prefix (line, BEGIN_CERTIFICATE)) {
-      i++;
-      break;
-    }
-  }
-
-  for (line = lines[i]; line; line = lines[++i]) {
-    if (line[0] && g_str_has_prefix (line, END_CERTIFICATE)) {
-      break;
-    }
-    tmp += g_base64_decode_step (line, strlen (line), tmp, &state, &save);
-  }
-  der_length = tmp - der;
-  checksum = g_checksum_new (G_CHECKSUM_SHA256);
-  digest_length = g_checksum_type_get_length (G_CHECKSUM_SHA256);
-  digest = g_new (guint8, digest_length);
-  g_checksum_update (checksum, der, der_length);
-  g_checksum_get_digest (checksum, digest, &digest_length);
-  fingerprint = g_string_new (NULL);
-  for (i = 0; i < digest_length; i++) {
-    if (i)
-      g_string_append (fingerprint, ":");
-    g_string_append_printf (fingerprint, "%02X", digest[i]);
-  }
-  ret = g_string_free (fingerprint, FALSE);
-
-  g_free (digest);
-  g_checksum_free (checksum);
-  g_free (der);
-  g_strfreev (lines);
-
-  return ret;
-}
-
-static gchar *
 kms_webrtc_session_generate_fingerprint_sdp_attr (KmsWebrtcSession * self,
     SdpMediaConfig * mconf)
 {
@@ -841,14 +784,12 @@ kms_webrtc_session_generate_fingerprint_sdp_attr (KmsWebrtcSession * self,
       kms_webrtc_session_get_connection (self, mconf);
   gchar *pem = kms_webrtc_base_connection_get_certificate_pem (conn);
 
-  if (pem == NULL) {
-    return NULL;
-  }
-
-  fp = generate_fingerprint_from_pem (pem);
+  fp = kms_utils_generate_fingerprint_from_pem (pem);
   g_free (pem);
 
   if (fp == NULL) {
+    GST_ELEMENT_ERROR (self, RESOURCE, FAILED,
+        (("Fingerprint not generated.")), (NULL));
     return NULL;
   }
 
@@ -911,6 +852,7 @@ gst_media_add_remote_candidates (KmsWebrtcSession * self,
   len = gst_sdp_media_attributes_len (media);
   for (i = 0; i < len; i++) {
     const GstSDPAttribute *attr;
+    gchar *candidate_str;
     KmsIceCandidate *candidate;
     gint idx = kms_sdp_media_config_get_id (mconf);
     const gchar *mid = kms_sdp_media_config_get_mid (mconf);
@@ -920,7 +862,9 @@ gst_media_add_remote_candidates (KmsWebrtcSession * self,
       continue;
     }
 
-    candidate = kms_ice_candidate_new (attr->value, mid, idx, NULL);
+    candidate_str = g_strdup_printf ("%s:%s", SDP_CANDIDATE_ATTR, attr->value);
+    candidate = kms_ice_candidate_new (candidate_str, mid, idx, NULL);
+    g_free (candidate_str);
     kms_webrtc_session_add_ice_candidate (self, candidate);
     g_object_unref (candidate);
   }
@@ -1161,7 +1105,7 @@ configure_data_session (KmsWebrtcSession * self, GstSDPMedia * media)
   guint i, len;
 
   len = gst_sdp_media_formats_len (media);
-  if (len < 0) {
+  if (len <= 0) {
     GST_WARNING_OBJECT (self, "No SCTP format");
     return FALSE;
   }
@@ -1387,35 +1331,6 @@ kms_webrtc_session_configure_connection (KmsWebrtcSession * self,
   return TRUE;
 }
 
-static void
-kms_webrtc_session_configure_connections (KmsWebrtcSession * self,
-    KmsSdpSession * sess, gboolean offerer)
-{
-  GSList *item = kms_sdp_message_context_get_medias (sess->neg_sdp_ctx);
-  GSList *remote_media_list =
-      kms_sdp_message_context_get_medias (sess->remote_sdp_ctx);
-
-  for (; item != NULL; item = g_slist_next (item)) {
-    SdpMediaConfig *neg_mconf = item->data;
-    gint mid = kms_sdp_media_config_get_id (neg_mconf);
-    SdpMediaConfig *remote_mconf;
-
-    if (kms_sdp_media_config_is_inactive (neg_mconf)) {
-      GST_DEBUG_OBJECT (self, "Media (id=%d) inactive", mid);
-      continue;
-    }
-
-    remote_mconf = g_slist_nth_data (remote_media_list, mid);
-    if (remote_mconf == NULL) {
-      GST_WARNING_OBJECT (self, "Media (id=%d) is not in the remote SDP", mid);
-      continue;
-    }
-
-    kms_webrtc_session_configure_connection (self, sess, neg_mconf,
-        remote_mconf, offerer);
-  }
-}
-
 void
 kms_webrtc_session_start_transport_send (KmsWebrtcSession * self,
     gboolean offerer)
@@ -1442,9 +1357,6 @@ kms_webrtc_session_start_transport_send (KmsWebrtcSession * self,
         offerer, NULL);
   }
 
-  /* Configure specific webrtc connection such as SCTP if negotiated */
-  kms_webrtc_session_configure_connections (self, sdp_sess, offerer);
-
   ufrag = gst_sdp_message_get_attribute_val (sdp, SDP_ICE_UFRAG_ATTR);
   pwd = gst_sdp_message_get_attribute_val (sdp, SDP_ICE_PWD_ATTR);
 
@@ -1469,6 +1381,11 @@ kms_webrtc_session_start_transport_send (KmsWebrtcSession * self,
       GST_WARNING_OBJECT (self, "Media (id=%d) is not in the remote SDP", mid);
       continue;
     }
+
+    /* Configure specific webrtc connection such as SCTP if negotiated */
+    kms_webrtc_session_configure_connection (self, sdp_sess, neg_mconf,
+        remote_mconf, offerer);
+
     gst_media_add_remote_candidates (self, remote_mconf, conn, ufrag, pwd);
   }
 
@@ -1961,18 +1878,4 @@ kms_webrtc_session_class_init (KmsWebrtcSessionClass * klass)
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
       G_STRUCT_OFFSET (KmsWebrtcSessionClass, destroy_data_channel),
       NULL, NULL, g_cclosure_marshal_VOID__INT, G_TYPE_NONE, 1, G_TYPE_INT);
-
-  /**
-   * KmsWebrtcSession::data-pads-remove:
-   * @webrtcsession: the object which received the signal
-   * @stream_id: the id of the DataChannel
-   *
-   * Emited before data pads are removed.
-   */
-  kms_webrtc_session_signals[SIGNAL_DATA_PADS_REMOVE] =
-      g_signal_new ("data-pads-remove",
-      G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST,
-      G_STRUCT_OFFSET (KmsWebrtcSessionClass, data_channel_closed),
-      NULL, NULL, g_cclosure_marshal_VOID__UINT, G_TYPE_NONE, 1, G_TYPE_UINT);
 }

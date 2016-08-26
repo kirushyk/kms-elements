@@ -1,3 +1,19 @@
+/*
+ * (C) Copyright 2016 Kurento (http://kurento.org/)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 #include <gst/gst.h>
 #include "MediaPipeline.hpp"
 #include <WebRtcEndpointImplFactory.hpp>
@@ -7,6 +23,8 @@
 #include <boost/filesystem.hpp>
 #include <IceCandidate.hpp>
 #include "IceCandidatePair.hpp"
+#include "IceConnection.hpp"
+#include "CertificateKeyType.hpp"
 #include <webrtcendpoint/kmsicecandidate.h>
 #include <IceComponentState.hpp>
 #include <SignalHandler.hpp>
@@ -22,6 +40,10 @@
 #include "webrtcendpoint/kmswebrtcdatachannelstate.h"
 #include <boost/algorithm/string.hpp>
 
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <string>
+
 #define GST_CAT_DEFAULT kurento_web_rtc_endpoint_impl
 GST_DEBUG_CATEGORY_STATIC (GST_CAT_DEFAULT);
 #define GST_DEFAULT_NAME "KurentoWebRtcEndpointImpl"
@@ -34,8 +56,10 @@ GST_DEBUG_CATEGORY_STATIC (GST_CAT_DEFAULT);
 namespace kurento
 {
 
-static const unsigned DEFAULT_STUN_PORT = 3478;
+static const uint DEFAULT_STUN_PORT = 3478;
 
+std::once_flag check_openh264, certificates_flag;
+std::string defaultCertificateRSA, defaultCertificateECDSA;
 std::vector<std::string> supported_codecs = { "VP8", "opus", "PCMU" };
 
 static void
@@ -107,6 +131,315 @@ check_support_for_h264 ()
   gst_object_unref (plugin);
 }
 
+std::string ParametersToPEMString (EC_GROUP *ec_group)
+{
+  BIO *temp_memory_bio = BIO_new (BIO_s_mem() );
+
+  if (!temp_memory_bio) {
+    GST_ERROR ("Failed to allocate temporary memory bio");
+    return "";
+  }
+
+  if (!PEM_write_bio_ECPKParameters (temp_memory_bio, ec_group) ) {
+    GST_ERROR ("Failed to write key parameters");
+    BIO_free (temp_memory_bio);
+    return "";
+  }
+
+  BIO_write (temp_memory_bio, "\0", 1);
+  char *buffer;
+  BIO_get_mem_data (temp_memory_bio, &buffer);
+  std::string parameters_str = buffer;
+  BIO_free (temp_memory_bio);
+
+  return parameters_str;
+}
+
+std::string ECDSAKeyToPEMString (EC_KEY *pkey_)
+{
+  BIO *temp_memory_bio = BIO_new (BIO_s_mem() );
+
+  if (!temp_memory_bio) {
+    GST_ERROR ("Failed to allocate temporary memory bio");
+    return "";
+  }
+
+  if (!PEM_write_bio_ECPrivateKey (
+        temp_memory_bio, pkey_, nullptr, nullptr, 0, nullptr, nullptr) ) {
+    GST_ERROR ("Failed to write ECDSA key");
+    BIO_free (temp_memory_bio);
+    return "";
+  }
+
+  BIO_write (temp_memory_bio, "\0", 1);
+  char *buffer;
+  BIO_get_mem_data (temp_memory_bio, &buffer);
+  std::string priv_key_str = buffer;
+  BIO_free (temp_memory_bio);
+
+  return priv_key_str;
+}
+
+std::string PrivateKeyToPEMString (EVP_PKEY *pkey_)
+{
+  BIO *temp_memory_bio = BIO_new (BIO_s_mem() );
+
+  if (!temp_memory_bio) {
+    GST_ERROR ("Failed to allocate temporary memory bio");
+    return "";
+  }
+
+  if (!PEM_write_bio_PrivateKey (
+        temp_memory_bio, pkey_, nullptr, nullptr, 0, nullptr, nullptr) ) {
+    GST_ERROR ("Failed to write private key");
+    BIO_free (temp_memory_bio);
+    return "";
+  }
+
+  BIO_write (temp_memory_bio, "\0", 1);
+  char *buffer;
+  BIO_get_mem_data (temp_memory_bio, &buffer);
+  std::string priv_key_str = buffer;
+  BIO_free (temp_memory_bio);
+
+  return priv_key_str;
+}
+
+static gchar *
+generate_certificate (EVP_PKEY *private_key)
+{
+  X509 *x509 = NULL;
+  BIO *bio = NULL;
+  X509_NAME *name = NULL;
+  int rc = 0;
+  unsigned long err = 0;
+  BUF_MEM *mem = NULL;
+  gchar *pem = NULL;
+
+  x509 = X509_new ();
+
+  if (x509 == NULL) {
+    GST_ERROR ("X509 not created");
+    goto end;
+  }
+
+  X509_set_version (x509, 2L);
+  ASN1_INTEGER_set (X509_get_serialNumber (x509), 0);
+  X509_gmtime_adj (X509_get_notBefore (x509), 0);
+  X509_gmtime_adj (X509_get_notAfter (x509), 31536000L);  /* A year */
+  X509_set_pubkey (x509, private_key);
+
+  name = X509_get_subject_name (x509);
+  X509_NAME_add_entry_by_txt (name, "C", MBSTRING_ASC, (unsigned char *) "SE",
+                              -1, -1, 0);
+  X509_NAME_add_entry_by_txt (name, "CN", MBSTRING_ASC,
+                              (unsigned char *) "Kurento", -1, -1, 0);
+  X509_set_issuer_name (x509, name);
+  name = NULL;
+
+  if (!X509_sign (x509, private_key, EVP_sha256 () ) ) {
+    GST_ERROR ("Failed to sign certificate");
+    goto end;
+  }
+
+  bio = BIO_new (BIO_s_mem () );
+
+  if (bio == NULL) {
+    GST_ERROR ("BIO not created");
+    goto end;
+  }
+
+  rc = PEM_write_bio_X509 (bio, x509);
+
+  if (rc != 1) {
+    err = ERR_get_error();
+    GST_ERROR ("PEM_write_bio_X509 failed, error %ld", err);
+    goto end;
+  }
+
+  BIO_get_mem_ptr (bio, &mem);
+
+  if (!mem || !mem->data || !mem->length) {
+    err = ERR_get_error();
+    GST_ERROR ("BIO_get_mem_ptr failed, error %ld", err);
+    goto end;
+  }
+
+  pem = g_strndup (mem->data, mem->length);
+
+end:
+
+  if (x509 != NULL) {
+    X509_free (x509);
+  }
+
+  if (bio != NULL) {
+    BIO_free_all (bio);
+  }
+
+  return pem;
+}
+
+static void
+generate_rsa_certificate ()
+{
+  RSA *rsa = NULL;
+  EVP_PKEY *private_key = NULL;
+  gchar *pem;
+  std::string rsaKey;
+
+  rsa = RSA_generate_key (2048, RSA_F4, NULL, NULL);
+
+  if (rsa == NULL) {
+    GST_ERROR ("RSA not created");
+    goto end;
+  }
+
+  private_key = EVP_PKEY_new ();
+
+  if (private_key == NULL) {
+    GST_ERROR ("Private key not created");
+    goto end;
+  }
+
+  if (EVP_PKEY_assign_RSA (private_key, rsa) == 0) {
+    GST_ERROR ("Private key not assigned");
+    goto end;
+  }
+
+  rsa = NULL;
+
+  pem = generate_certificate (private_key);
+
+  if (pem == NULL) {
+    GST_WARNING ("Certificate not generated");
+    goto end;
+  }
+
+  rsaKey = PrivateKeyToPEMString (private_key);
+  defaultCertificateRSA = rsaKey + std::string (pem);
+  g_free (pem);
+
+end:
+
+  if (rsa != NULL) {
+    RSA_free (rsa);
+  }
+
+  if (private_key != NULL) {
+    EVP_PKEY_free (private_key);
+  }
+}
+
+static void
+generate_ecdsa_certificate ()
+{
+  EC_KEY *ec_key = NULL;
+  EC_GROUP *group = NULL;
+  EVP_PKEY *private_key = NULL;
+  gchar *pem;
+  std::string ecdsaParameters, ecdsaKey;
+
+  ec_key = EC_KEY_new ();
+
+  if (ec_key == NULL) {
+    GST_ERROR ("EC key not created");
+    goto end;
+  }
+
+  group = EC_GROUP_new_by_curve_name (NID_X9_62_prime256v1);
+  EC_GROUP_set_asn1_flag (group, OPENSSL_EC_NAMED_CURVE);
+
+  if (ec_key == NULL) {
+    GST_ERROR ("EC group not created");
+    goto end;
+  }
+
+  if (EC_KEY_set_group (ec_key, group) == 0) {
+    GST_ERROR ("Group not set to key");
+    goto end;
+  }
+
+  if (EC_KEY_generate_key (ec_key) == 0) {
+    GST_ERROR ("EC key not generated");
+    goto end;
+  }
+
+  private_key = EVP_PKEY_new ();
+
+  if (private_key == NULL) {
+    GST_ERROR ("Private key not created");
+    goto end;
+  }
+
+  if (EVP_PKEY_assign_EC_KEY (private_key, ec_key) == 0) {
+    GST_ERROR ("Private key not assigned");
+    goto end;
+  }
+
+  pem = generate_certificate (private_key);
+
+  if (pem == NULL) {
+    GST_WARNING ("Certificate not generated");
+    goto end;
+  }
+
+  ecdsaKey = ECDSAKeyToPEMString (ec_key);
+  ec_key = NULL;
+  ecdsaParameters = ParametersToPEMString (group);
+
+  defaultCertificateECDSA = ecdsaParameters + ecdsaKey + std::string (pem);
+  g_free (pem);
+
+end:
+
+  if (ec_key != NULL) {
+    EC_KEY_free (ec_key);
+  }
+
+  if (private_key != NULL) {
+    EVP_PKEY_free (private_key);
+  }
+
+  if (group != NULL) {
+    EC_GROUP_free (group);
+  }
+}
+
+void
+WebRtcEndpointImpl::generateDefaultCertificates ()
+{
+  std::string pemUri;
+  std::string pemUriRSA;
+  std::string pemUriECDSA;
+
+  defaultCertificateECDSA = "";
+  defaultCertificateRSA = "";
+
+  try {
+    pemUriRSA = getConfigValue <std::string, WebRtcEndpoint> ("pemCertificateRSA");
+    defaultCertificateRSA = getCerficateFromFile (pemUriRSA);
+  } catch (boost::property_tree::ptree_error &e) {
+    try {
+      pemUri = getConfigValue <std::string, WebRtcEndpoint> ("pemCertificate");
+      GST_WARNING ("pemCertificate is deprecated. Please use pemCertificateRSA instead");
+      defaultCertificateRSA = getCerficateFromFile (pemUri);
+    } catch (boost::property_tree::ptree_error &e) {
+      GST_INFO ("Unable to load the RSA certificate from file. Using the default certificate.");
+      generate_rsa_certificate ();
+    }
+  }
+
+  try {
+    pemUriECDSA = getConfigValue
+                  <std::string, WebRtcEndpoint> ("pemCertificateECDSA");
+    defaultCertificateECDSA = getCerficateFromFile (pemUriECDSA);
+  } catch (boost::property_tree::ptree_error &e) {
+    GST_INFO ("Unable to load the ECDSA certificate from file. Using the default certificate.");
+    generate_ecdsa_certificate ();
+  }
+}
+
 void WebRtcEndpointImpl::checkUri (std::string &uri)
 {
   //Check if uri is an absolute or relative path.
@@ -134,8 +467,11 @@ void WebRtcEndpointImpl::onIceCandidate (gchar *sessId,
     std::shared_ptr <IceCandidate> cand ( new  IceCandidate
                                           (cand_str, mid_str, sdp_m_line_index) );
     OnIceCandidate event (shared_from_this(), OnIceCandidate::getName(), cand);
+    IceCandidateFound newEvent (shared_from_this(), IceCandidateFound::getName(),
+                                cand);
 
     signalOnIceCandidate (event);
+    signalIceCandidateFound (newEvent);
   } catch (std::bad_weak_ptr &e) {
   }
 }
@@ -144,8 +480,10 @@ void WebRtcEndpointImpl::onIceGatheringDone (gchar *sessId)
 {
   try {
     OnIceGatheringDone event (shared_from_this(), OnIceGatheringDone::getName() );
+    IceGatheringDone newEvent (shared_from_this(), IceGatheringDone::getName() );
 
     signalOnIceGatheringDone (event);
+    signalIceGatheringDone (newEvent);
   } catch (std::bad_weak_ptr &e) {
   }
 }
@@ -156,6 +494,9 @@ void WebRtcEndpointImpl::onIceComponentStateChanged (gchar *sessId,
 {
   try {
     IceComponentState::type type;
+    std::shared_ptr<IceConnection> connectionState;
+    std::map < std::string, std::shared_ptr<IceConnection>>::iterator it;
+    std::string key;
 
     switch (state) {
     case ICE_STATE_DISCONNECTED:
@@ -187,13 +528,30 @@ void WebRtcEndpointImpl::onIceComponentStateChanged (gchar *sessId,
       break;
     }
 
-    IceComponentState *componentState = new IceComponentState (type);
+    IceComponentState *componentState_event = new IceComponentState (type);
+    IceComponentState *newComponentState_event = new IceComponentState (type);
+    IceComponentState *componentState_property = new IceComponentState (type);
     OnIceComponentStateChanged event (shared_from_this(),
                                       OnIceComponentStateChanged::getName(),
                                       atoi (streamId), componentId,
-                                      std::shared_ptr<IceComponentState> (componentState) );
+                                      std::shared_ptr<IceComponentState> (componentState_event) );
+    IceComponentStateChange newEvent (shared_from_this(),
+                                      IceComponentStateChange::getName(),
+                                      atoi (streamId), componentId,
+                                      std::shared_ptr<IceComponentState> (newComponentState_event) );
+
+    connectionState = std::make_shared< IceConnection> (streamId, componentId,
+                      std::shared_ptr<IceComponentState> (componentState_property) );
+    key = std::string (streamId) + '_' + std::to_string (componentId);
+
+    std::unique_lock<std::mutex> mutex (mut);
+    it = iceConnectionState.find (key);
+    iceConnectionState[key] = connectionState;
+    iceConnectionState.insert (std::pair
+                               <std::string, std::shared_ptr <IceConnection>> (key, connectionState) );
 
     signalOnIceComponentStateChanged (event);
+    signalIceComponentStateChange (newEvent);
   } catch (std::bad_weak_ptr &e) {
   }
 }
@@ -217,7 +575,7 @@ void WebRtcEndpointImpl::newSelectedPairFull (gchar *sessId,
                   componentId,
                   kms_ice_candidate_get_candidate (localCandidate),
                   kms_ice_candidate_get_candidate (remoteCandidate) );
-  key = streamId + '_' + componentId;
+  key = std::string (streamId) + "_" + std::to_string (componentId);
 
   it = candidatePairs.find (key);
 
@@ -243,7 +601,10 @@ WebRtcEndpointImpl::onDataChannelOpened (gchar *sessId, guint stream_id)
   try {
     OnDataChannelOpened event (shared_from_this(), OnDataChannelOpened::getName(),
                                stream_id);
+    DataChannelOpen newEvent (shared_from_this(), DataChannelOpen::getName(),
+                              stream_id);
     signalOnDataChannelOpened (event);
+    signalDataChannelOpen (newEvent);
   } catch (std::bad_weak_ptr &e) {
   }
 }
@@ -254,7 +615,10 @@ WebRtcEndpointImpl::onDataChannelClosed (gchar *sessId, guint stream_id)
   try {
     OnDataChannelClosed event (shared_from_this(), OnDataChannelClosed::getName(),
                                stream_id);
+    DataChannelClose newEvent (shared_from_this(), DataChannelClose::getName(),
+                               stream_id);
     signalOnDataChannelClosed (event);
+    signalDataChannelClose (newEvent);
   } catch (std::bad_weak_ptr &e) {
   }
 }
@@ -315,9 +679,28 @@ void WebRtcEndpointImpl::postConstructor ()
                                (shared_from_this() ) );
 }
 
+std::string
+WebRtcEndpointImpl::getCerficateFromFile (std::string &path)
+{
+  std::ifstream inFile;
+  std::stringstream strStream;
+  std::string certificate;
+
+  //check if the uri is absolute or relative
+  checkUri (path);
+  GST_INFO ("pemCertificate in: %s\n", path.c_str() );
+
+  inFile.open (path);
+  strStream << inFile.rdbuf();
+  certificate = strStream.str();
+
+  return certificate;
+}
+
 WebRtcEndpointImpl::WebRtcEndpointImpl (const boost::property_tree::ptree &conf,
                                         std::shared_ptr<MediaPipeline>
-                                        mediaPipeline, bool useDataChannels) :
+                                        mediaPipeline, bool useDataChannels,
+                                        std::shared_ptr<CertificateKeyType> certificateKeyType) :
   BaseRtpEndpointImpl (conf,
                        std::dynamic_pointer_cast<MediaObjectImpl>
                        (mediaPipeline), FACTORY_NAME)
@@ -327,6 +710,16 @@ WebRtcEndpointImpl::WebRtcEndpointImpl (const boost::property_tree::ptree &conf,
   std::string turnURL;
   std::string pemUri;
   std::string pemCertificate;
+
+  if (useDataChannels) {
+    g_object_set (element, "use-data-channels", TRUE, NULL);
+  }
+
+  remove_not_supported_codecs (element);
+
+  std::call_once (check_openh264, check_support_for_h264);
+  std::call_once (certificates_flag,
+                  std::bind (&WebRtcEndpointImpl::generateDefaultCertificates, this) );
 
   if (useDataChannels) {
     g_object_set (element, "use-data-channels", TRUE, NULL);
@@ -372,26 +765,29 @@ WebRtcEndpointImpl::WebRtcEndpointImpl (const boost::property_tree::ptree &conf,
 
   }
 
-  try {
-    std::ifstream inFile;
-    std::stringstream strStream;
+  switch (certificateKeyType->getValue () ) {
+  case CertificateKeyType::RSA: {
+    if (defaultCertificateRSA != "") {
+      g_object_set ( G_OBJECT (element), "pem-certificate",
+                     defaultCertificateRSA.c_str(),
+                     NULL);
+    }
 
-    pemUri = getConfigValue <std::string, WebRtcEndpoint> ("pemCertificate");
+    break;
+  }
 
-    //check if the uri is absolute or relative
-    checkUri (pemUri);
-    GST_INFO ("pemCertificate in: %s\n", pemUri.c_str() );
+  case CertificateKeyType::ECDSA: {
+    if (defaultCertificateECDSA != "") {
+      g_object_set ( G_OBJECT (element), "pem-certificate",
+                     defaultCertificateECDSA.c_str(),
+                     NULL);
+    }
 
-    inFile.open (pemUri);
-    strStream << inFile.rdbuf();
-    pemCertificate = strStream.str();
-    GST_INFO ("pemCertificate content: %s\n", pemCertificate.c_str() );
+    break;
+  }
 
-    g_object_set ( G_OBJECT (element), "pem-certificate", pemCertificate.c_str(),
-                   NULL);
-
-  } catch (boost::property_tree::ptree_error &e) {
-
+  default:
+    GST_ERROR ("Certificate key not supported");
   }
 }
 
@@ -498,6 +894,20 @@ std::vector<std::shared_ptr<IceCandidatePair>>
   }
 
   return candidates;
+}
+
+std::vector<std::shared_ptr<IceConnection>>
+    WebRtcEndpointImpl::getIceConnectionState ()
+{
+  std::vector<std::shared_ptr<IceConnection>> connections;
+  std::map<std::string, std::shared_ptr <IceConnection>>::iterator it;
+  std::unique_lock<std::mutex> mutex (mut);
+
+  for (it = iceConnectionState.begin(); it != iceConnectionState.end(); it++) {
+    connections.push_back ( (*it).second);
+  }
+
+  return connections;
 }
 
 void
@@ -782,9 +1192,11 @@ WebRtcEndpointImpl::fillStatsReport (std::map
 MediaObjectImpl *
 WebRtcEndpointImplFactory::createObject (const boost::property_tree::ptree
     &conf, std::shared_ptr<MediaPipeline>
-    mediaPipeline, bool useDataChannels) const
+    mediaPipeline, bool useDataChannels,
+    std::shared_ptr<CertificateKeyType> certificateKeyType) const
 {
-  return new WebRtcEndpointImpl (conf, mediaPipeline, useDataChannels);
+  return new WebRtcEndpointImpl (conf, mediaPipeline, useDataChannels,
+                                 certificateKeyType);
 }
 
 WebRtcEndpointImpl::StaticConstructor WebRtcEndpointImpl::staticConstructor;

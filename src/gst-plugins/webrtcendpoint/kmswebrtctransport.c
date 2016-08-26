@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2015 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -21,6 +23,13 @@
 #define GST_CAT_DEFAULT kmswebrtctransport
 GST_DEBUG_CATEGORY_STATIC (GST_CAT_DEFAULT);
 #define GST_DEFAULT_NAME "kmswebrtctransport"
+
+#define parent_class kms_webrtc_transport_parent_class
+
+G_DEFINE_TYPE_WITH_CODE (KmsWebRtcTransport, kms_webrtc_transport,
+    G_TYPE_OBJECT,
+    GST_DEBUG_CATEGORY_INIT (GST_CAT_DEFAULT, GST_DEFAULT_NAME, 0,
+        GST_DEFAULT_NAME));
 
 static void
 element_remove_probe (GstElement * e, const gchar * pad_name, gulong id)
@@ -36,38 +45,55 @@ element_remove_probe (GstElement * e, const gchar * pad_name, gulong id)
   g_object_unref (pad);
 }
 
-void
-kms_webrtc_transport_destroy (KmsWebRtcTransport * tr)
+static void
+kms_webrtc_transport_finalize (GObject * object)
 {
-  if (tr == NULL) {
-    return;
-  }
+  KmsWebRtcTransport *self = KMS_WEBRTC_TRANSPORT (object);
 
-  element_remove_probe (tr->src->src, "src", tr->src_probe);
-  element_remove_probe (tr->sink->sink, "sink", tr->sink_probe);
+  element_remove_probe (self->src->src, "src", self->src_probe);
+  element_remove_probe (self->sink->sink, "sink", self->sink_probe);
 
-  g_clear_object (&tr->src);
-  g_clear_object (&tr->sink);
+  g_clear_object (&self->src);
+  g_clear_object (&self->sink);
 
-  g_slice_free (KmsWebRtcTransport, tr);
+  G_OBJECT_CLASS (parent_class)->finalize (object);
+}
+
+static void
+kms_webrtc_transport_class_init (KmsWebRtcTransportClass * klass)
+{
+  GObjectClass *gobject_class;
+
+  gobject_class = G_OBJECT_CLASS (klass);
+  gobject_class->finalize = kms_webrtc_transport_finalize;
+}
+
+static void
+kms_webrtc_transport_init (KmsWebRtcTransport * self)
+{
+  self->src = KMS_WEBRTC_TRANSPORT_SRC (kms_webrtc_transport_src_nice_new ());
+  self->sink =
+      KMS_WEBRTC_TRANSPORT_SINK (kms_webrtc_transport_sink_nice_new ());
 }
 
 KmsWebRtcTransport *
-kms_webrtc_transport_create (KmsIceBaseAgent * agent, char *stream_id,
-    guint component_id, gchar * pem_certificate)
+kms_webrtc_transport_new (KmsIceBaseAgent * agent,
+    char *stream_id, guint component_id, gchar * pem_certificate)
 {
   KmsWebRtcTransport *tr;
   gchar *str;
 
-  tr = g_slice_new0 (KmsWebRtcTransport);
+  if (!KMS_IS_ICE_NICE_AGENT (agent)) {
+    GST_ERROR ("Agent type not found");
 
-  if (KMS_IS_ICE_NICE_AGENT (agent)) {
-    tr->src = KMS_WEBRTC_TRANSPORT_SRC (kms_webrtc_transport_src_nice_new ());
-    tr->sink =
-        KMS_WEBRTC_TRANSPORT_SINK (kms_webrtc_transport_sink_nice_new ());
-  } else {
-    GST_ERROR_OBJECT (tr, "Agent type not found");
     return NULL;
+  }
+
+  tr = KMS_WEBRTC_TRANSPORT (g_object_new (KMS_TYPE_WEBRTC_TRANSPORT, NULL));
+
+  if (pem_certificate != NULL) {
+    g_object_set (G_OBJECT (tr->src->dtlssrtpdec), "pem", pem_certificate,
+        NULL);
   }
 
   str =
@@ -77,11 +103,6 @@ kms_webrtc_transport_create (KmsIceBaseAgent * agent, char *stream_id,
   g_object_set (G_OBJECT (tr->sink->dtlssrtpenc), "connection-id", str, NULL);
   g_object_set (G_OBJECT (tr->src->dtlssrtpdec), "connection-id", str, NULL);
   g_free (str);
-
-  if (pem_certificate != NULL) {
-    g_object_set (G_OBJECT (tr->src->dtlssrtpdec), "pem", pem_certificate,
-        NULL);
-  }
 
   kms_webrtc_transport_src_configure (tr->src, agent, stream_id, component_id);
   kms_webrtc_transport_sink_configure (tr->sink, agent, stream_id,
@@ -118,13 +139,4 @@ kms_webrtc_transport_disable_latency_notification (KmsWebRtcTransport * tr)
 
   element_remove_probe (tr->sink->sink, "sink", tr->sink_probe);
   tr->sink_probe = 0UL;
-}
-
-static void init_debug (void) __attribute__ ((constructor));
-
-static void
-init_debug (void)
-{
-  GST_DEBUG_CATEGORY_INIT (GST_CAT_DEFAULT, GST_DEFAULT_NAME, 0,
-      GST_DEFAULT_NAME);
 }

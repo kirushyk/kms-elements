@@ -1,15 +1,17 @@
 /*
  * (C) Copyright 2015 Kurento (http://kurento.org/)
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the GNU Lesser General Public License
- * (LGPL) version 2.1 which accompanies this distribution, and is available at
- * http://www.gnu.org/licenses/lgpl-2.1.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -241,6 +243,55 @@ kms_ice_base_agent_get_local_candidates_default (KmsIceBaseAgent * self,
   return NULL;
 }
 
+static GSList *
+kms_ice_base_agent_get_remote_candidates_default (KmsIceBaseAgent * self,
+    const char *stream_id, guint component_id)
+{
+  KmsIceBaseAgentClass *klass =
+      KMS_ICE_BASE_AGENT_CLASS (G_OBJECT_GET_CLASS (self));
+
+  if (klass->get_remote_candidates ==
+      kms_ice_base_agent_get_remote_candidates_default) {
+    GST_WARNING_OBJECT (self,
+        "%s does not reimplement 'get_remote_candidates'",
+        G_OBJECT_CLASS_NAME (klass));
+  }
+
+  return NULL;
+}
+
+static IceState
+kms_ice_base_agent_get_component_state_default (KmsIceBaseAgent * self,
+    const char *stream_id, guint component_id)
+{
+  KmsIceBaseAgentClass *klass =
+      KMS_ICE_BASE_AGENT_CLASS (G_OBJECT_GET_CLASS (self));
+
+  if (klass->get_component_state ==
+      kms_ice_base_agent_get_component_state_default) {
+    GST_WARNING_OBJECT (self,
+        "%s does not reimplement 'get_component_state'",
+        G_OBJECT_CLASS_NAME (klass));
+  }
+
+  return ICE_STATE_DISCONNECTED;
+}
+
+static gboolean
+kms_ice_base_agent_get_controlling_mode_default (KmsIceBaseAgent * self)
+{
+  KmsIceBaseAgentClass *klass =
+      KMS_ICE_BASE_AGENT_CLASS (G_OBJECT_GET_CLASS (self));
+
+  if (klass->get_controlling_mode ==
+      kms_ice_base_agent_get_controlling_mode_default) {
+    GST_WARNING_OBJECT (self, "%s does not reimplement 'get_controlling_mode'",
+        G_OBJECT_CLASS_NAME (klass));
+  }
+
+  return FALSE;
+}
+
 static void
 kms_ice_base_agent_run_agent_default (KmsIceBaseAgent * self)
 {
@@ -362,6 +413,35 @@ kms_ice_base_agent_get_local_candidates (KmsIceBaseAgent * self,
   return klass->get_local_candidates (self, stream_id, component_id);
 }
 
+GSList *
+kms_ice_base_agent_get_remote_candidates (KmsIceBaseAgent * self,
+    const char *stream_id, guint component_id)
+{
+  KmsIceBaseAgentClass *klass =
+      KMS_ICE_BASE_AGENT_CLASS (G_OBJECT_GET_CLASS (self));
+
+  return klass->get_remote_candidates (self, stream_id, component_id);
+}
+
+IceState
+kms_ice_base_agent_get_component_state (KmsIceBaseAgent * self,
+    const char *stream_id, guint component_id)
+{
+  KmsIceBaseAgentClass *klass =
+      KMS_ICE_BASE_AGENT_CLASS (G_OBJECT_GET_CLASS (self));
+
+  return klass->get_component_state (self, stream_id, component_id);
+}
+
+gboolean
+kms_ice_base_agent_get_controlling_mode (KmsIceBaseAgent * self)
+{
+  KmsIceBaseAgentClass *klass =
+      KMS_ICE_BASE_AGENT_CLASS (G_OBJECT_GET_CLASS (self));
+
+  return klass->get_controlling_mode (self);
+}
+
 void
 kms_ice_base_agent_run_agent (KmsIceBaseAgent * self)
 {
@@ -396,6 +476,10 @@ kms_ice_base_agent_class_init (KmsIceBaseAgentClass * klass)
   klass->get_default_local_candidate =
       kms_ice_base_agent_get_default_local_candidate_default;
   klass->get_local_candidates = kms_ice_base_agent_get_local_candidates_default;
+  klass->get_remote_candidates =
+      kms_ice_base_agent_get_remote_candidates_default;
+  klass->get_component_state = kms_ice_base_agent_get_component_state_default;
+  klass->get_controlling_mode = kms_ice_base_agent_get_controlling_mode_default;
   klass->run_agent = kms_ice_base_agent_run_agent_default;
 
   /**
